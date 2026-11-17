@@ -1,4 +1,9 @@
-import { Component, inject, signal } from '@angular/core';
+import {
+  Component,
+  computed,
+  inject,
+  signal,
+} from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
 import { forkJoin, of } from 'rxjs';
@@ -88,6 +93,43 @@ export class App {
   readonly error = signal('');
   readonly success = signal('');
 
+  // My Requests filters.
+  readonly historySearch = signal('');
+  readonly historyStatus = signal('ALL');
+  readonly historyFrom = signal('');
+  readonly historyTo = signal('');
+
+  // Manager Approvals filters.
+  readonly approvalSearch = signal('');
+  readonly approvalStatus = signal('ALL');
+  readonly approvalFrom = signal('');
+  readonly approvalTo = signal('');
+
+  readonly filteredRequests = computed(() =>
+    this.requests().filter((request) =>
+      this.matchesRequest(
+        request,
+        this.historySearch(),
+        this.historyStatus(),
+        this.historyFrom(),
+        this.historyTo(),
+      ),
+    ),
+  );
+
+  readonly filteredTeamRequests = computed(() =>
+    this.teamRequests().filter((request) =>
+      this.matchesRequest(
+        request,
+        this.approvalSearch(),
+        this.approvalStatus(),
+        this.approvalFrom(),
+        this.approvalTo(),
+        `${request.user.name} ${request.user.email}`,
+      ),
+    ),
+  );
+
   isWorking() {
     return (
       this.busy() ||
@@ -114,6 +156,8 @@ export class App {
         this.showSignup.set(false);
         this.showForgotPassword.set(false);
         this.activeTab.set('dashboard');
+        this.clearHistoryFilters();
+        this.clearApprovalFilters();
         this.password = '';
         this.loadDashboard();
       },
@@ -248,6 +292,7 @@ export class App {
 
         this.year = requestYear;
         this.calendarMonth = requestMonth;
+        this.clearHistoryFilters();
         this.activeTab.set('history');
 
         this.loadDashboard();
@@ -282,7 +327,10 @@ export class App {
     });
   }
 
-  decideRequest(id: number, status: 'APPROVED' | 'REJECTED') {
+  decideRequest(
+    id: number,
+    status: 'APPROVED' | 'REJECTED',
+  ) {
     if (this.isWorking()) return;
 
     const action = status === 'APPROVED' ? 'Approve' : 'Reject';
@@ -308,6 +356,50 @@ export class App {
         this.handleError(error);
       },
     });
+  }
+
+  clearHistoryFilters() {
+    this.historySearch.set('');
+    this.historyStatus.set('ALL');
+    this.historyFrom.set('');
+    this.historyTo.set('');
+  }
+
+  clearApprovalFilters() {
+    this.approvalSearch.set('');
+    this.approvalStatus.set('ALL');
+    this.approvalFrom.set('');
+    this.approvalTo.set('');
+  }
+
+  private matchesRequest(
+    request: LeaveRequest,
+    search: string,
+    status: string,
+    from: string,
+    to: string,
+    employee = '',
+  ): boolean {
+    if (from && to && from > to) return false;
+
+    const query = search.trim().toLowerCase();
+
+    const text = [
+      employee,
+      request.leaveType.name,
+      request.reason,
+      String(request.id),
+    ].join(' ').toLowerCase();
+
+    const start = request.startDate.slice(0, 10);
+    const end = request.endDate.slice(0, 10);
+
+    return (
+      (!query || text.includes(query)) &&
+      (status === 'ALL' || request.status === status) &&
+      (!from || end >= from) &&
+      (!to || start <= to)
+    );
   }
 
   loadCalendar() {
@@ -361,7 +453,8 @@ export class App {
           const key = date.toISOString().slice(0, 10);
 
           const weekend =
-            date.getUTCDay() === 0 || date.getUTCDay() === 6;
+            date.getUTCDay() === 0 ||
+            date.getUTCDay() === 6;
 
           const holidays = calendar.holidays
             .filter(
@@ -427,6 +520,9 @@ export class App {
     this.showForgotPassword.set(false);
     this.activeTab.set('dashboard');
     this.api.logout();
+
+    this.clearHistoryFilters();
+    this.clearApprovalFilters();
 
     this.user.set(null);
     this.balances.set([]);

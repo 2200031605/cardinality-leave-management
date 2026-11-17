@@ -255,6 +255,30 @@ fieldset {
   color: #21643b;
 }
 
+/* Search and filters */
+
+.request-filters {
+  display: grid;
+  grid-template-columns:
+    minmax(180px, 2fr)
+    repeat(3, minmax(120px, 1fr))
+    auto;
+  align-items: end;
+  gap: 12px;
+  margin: 24px 0 12px;
+}
+
+.request-filters > div {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.request-filters input,
+.request-filters select {
+  width: 100%;
+}
+
 /* Request tables */
 
 .table-scroll {
@@ -434,6 +458,14 @@ th {
   overflow-wrap: anywhere;
 }
 
+/* Tablet layout */
+
+@media (max-width: 900px) {
+  .request-filters {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 /* Mobile layout */
 
 @media (max-width: 600px) {
@@ -453,10 +485,6 @@ th {
     font-size: 24px;
   }
 
-  .navigation {
-    gap: 8px;
-  }
-
   .navigation button {
     padding: 10px 12px;
     font-size: 13px;
@@ -468,5 +496,9 @@ th {
 
   .calendar-controls input {
     flex: 1;
+  }
+
+  .request-filters {
+    grid-template-columns: 1fr;
   }
 }
