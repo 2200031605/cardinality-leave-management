@@ -1,6 +1,12 @@
-import { describe, expect, it, jest } from '@jest/globals';
+import {
+  describe,
+  expect,
+  it,
+  jest,
+} from '@jest/globals';
 import { LeaveService } from './leave.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { MailService } from '../mail/mail.service';
 
 describe('Leave cancellation and balances', () => {
   it.each(['PENDING', 'APPROVED'] as const)(
@@ -44,7 +50,9 @@ describe('Leave cancellation and balances', () => {
             userId: number;
             status: { in: string[] };
           };
-          data: { status: 'CANCELLED' };
+          data: {
+            status: 'CANCELLED';
+          };
         }) => {
           if (
             query.where.id !== request.id ||
@@ -55,6 +63,7 @@ describe('Leave cancellation and balances', () => {
           }
 
           request.status = query.data.status;
+
           return { count: 1 };
         },
       );
@@ -77,7 +86,9 @@ describe('Leave cancellation and balances', () => {
         },
         leaveRequest: {
           findMany,
-          findUnique: jest.fn(async () => ({ ...request })),
+          findUnique: jest.fn(
+            async () => ({ ...request }),
+          ),
           updateMany,
           findUniqueOrThrow: jest.fn(
             async () => ({ ...request }),
@@ -85,8 +96,18 @@ describe('Leave cancellation and balances', () => {
         },
       };
 
+      const mail = {
+        sendLeaveRequestNotification: jest.fn(
+          async () => undefined,
+        ),
+        sendLeaveDecisionNotification: jest.fn(
+          async () => undefined,
+        ),
+      };
+
       const service = new LeaveService(
         prisma as unknown as PrismaService,
+        mail as unknown as MailService,
       );
 
       const before = await service.getMyBalances(1, 2027);
@@ -100,7 +121,10 @@ describe('Leave cancellation and balances', () => {
         }),
       );
 
-      const cancelled = await service.cancel(1, request.id);
+      const cancelled = await service.cancel(
+        1,
+        request.id,
+      );
 
       expect(cancelled.status).toBe('CANCELLED');
 
@@ -119,14 +143,15 @@ describe('Leave cancellation and balances', () => {
         after[0].remaining - before[0].remaining,
       ).toBe(2);
 
-      // Repeating cancellation must not return the days twice.
+      // Cancellation cannot restore the same days twice.
       await expect(
         service.cancel(1, request.id),
       ).rejects.toThrow(
         'Only pending or approved requests can be cancelled',
       );
 
-      const finalBalance = await service.getMyBalances(1, 2027);
+      const finalBalance =
+        await service.getMyBalances(1, 2027);
 
       expect(finalBalance[0].remaining).toBe(20);
     },

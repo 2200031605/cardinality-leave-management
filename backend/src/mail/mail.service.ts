@@ -127,4 +127,52 @@ export class MailService {
       ].join('\n'),
     );
   }
+
+  async sendLeaveRequestNotification(data: {
+  managerEmail: string;
+  employeeName: string;
+  leaveType: string;
+  startDate: string;
+  endDate: string;
+  days: number;
+}): Promise<void> {
+  await this.send(
+    data.managerEmail,
+    'New leave request awaiting your decision',
+    [
+      `${data.employeeName} submitted a leave request.`,
+      '',
+      `Leave type: ${data.leaveType}`,
+      `Start date: ${data.startDate}`,
+      `End date: ${data.endDate}`,
+      `Working days: ${data.days}`,
+      '',
+      'Sign in to Leave Management and open Approvals',
+      'to review the request.',
+    ].join('\n'),
+  );
+}
+
+async sendLeaveDecisionNotification(data: {
+  employeeEmail: string;
+  leaveType: string;
+  startDate: string;
+  endDate: string;
+  status: 'APPROVED' | 'REJECTED';
+}): Promise<void> {
+  await this.send(
+    data.employeeEmail,
+    `Your leave request was ${data.status.toLowerCase()}`,
+    [
+      `Your leave request has been ${data.status.toLowerCase()}.`,
+      '',
+      `Leave type: ${data.leaveType}`,
+      `Start date: ${data.startDate}`,
+      `End date: ${data.endDate}`,
+      '',
+      'Sign in to Leave Management to view your updated',
+      'request status and balance.',
+    ].join('\n'),
+  );
+}
 }
