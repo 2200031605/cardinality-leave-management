@@ -414,6 +414,24 @@ export class ApiService {
     );
   }
 
+    askAssistant(data: {
+    topic: 'policies' | 'balance' | 'requests' | 'availability';
+    question: string;
+    year?: number;
+    startDate?: string;
+    endDate?: string;
+  }) {
+    return this.http.post<{
+      answer: string;
+      topic: string;
+      generatedAt: string;
+    }>(
+      `${this.baseUrl}/assistant/ask`,
+      data,
+      { headers: this.headers },
+    );
+  }
+
   logout() {
     this.token = '';
   }

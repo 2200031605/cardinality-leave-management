@@ -10,6 +10,8 @@ import { AdminModule } from './admin/admin.module';
 import { HolidaysModule } from './holidays/holidays.module';
 import { SignupModule } from './signup/signup.module';
 import { PasswordResetModule } from './password-reset/password-reset.module';
+import { AssistantModule } from './assistant/assistant.module';
+
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
@@ -21,6 +23,7 @@ import { PasswordResetModule } from './password-reset/password-reset.module';
     AdminModule,
     HolidaysModule,
     PasswordResetModule,
+    AssistantModule,
   ],
   controllers: [AppController],
   providers: [AppService],

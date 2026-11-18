@@ -24,6 +24,8 @@ import { EmployeeAdmin } from './employee-admin';
 import { ForgotPassword } from './forgot-password';
 import { TeamAvailabilityComponent } from './team-availability';
 import { TeamLeaveChart } from './team-leave-chart';
+import { LeaveAssistant } from './leave-assistant';
+
 
 import type {
   CalendarRequest,
@@ -69,6 +71,7 @@ interface CalendarDay {
     ForgotPassword,
     TeamAvailabilityComponent,
     TeamLeaveChart,
+    LeaveAssistant,
   ],
   templateUrl: './app.html',
   styleUrl: './app.scss',

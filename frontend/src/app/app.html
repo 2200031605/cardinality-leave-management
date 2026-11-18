@@ -64,9 +64,7 @@
               type="button"
               data-nav="availability"
               [class.active]="activeTab() === 'availability'"
-              [attr.aria-current]="
-                activeTab() === 'availability' ? 'page' : null
-              "
+              [attr.aria-current]="activeTab() === 'availability' ? 'page' : null"
               (click)="navigateTab('availability')"
             >
               Team availability
@@ -98,7 +96,6 @@
 
         <div class="sidebar-bottom">
           <span class="avatar">{{ initials() }}</span>
-
           <div>
             <strong>{{ currentUser.name }}</strong>
             <small>{{ currentUser.role }}</small>
@@ -128,7 +125,6 @@
         <div class="topbar-user">
           <span class="role-pill">{{ currentUser.role }}</span>
           <span class="avatar">{{ initials() }}</span>
-
           <button
             class="text-button"
             type="button"
@@ -167,14 +163,10 @@
         @if (activeTab() === 'dashboard') {
           <section class="page-intro">
             <div>
-              <span class="eyebrow">
-                YOUR WORKSPACE, AT A GLANCE
-              </span>
+              <span class="eyebrow">YOUR WORKSPACE, AT A GLANCE</span>
 
               <h1>
-                {{ greeting() }}, {{ firstName() }}<span
-                  class="greeting-dot"
-                >.</span>
+                {{ greeting() }}, {{ firstName() }}<span class="greeting-dot">.</span>
               </h1>
 
               <p>
@@ -201,46 +193,30 @@
 
           @if (currentUser.role === 'ADMIN') {
             <div class="admin-shortcuts">
-              <button
-                type="button"
-                (click)="openAdmin('employees')"
-              >
+              <button type="button" (click)="openAdmin('employees')">
                 <span class="shortcut-icon">01</span>
                 <strong>People & teams</strong>
-                <span>
-                  Manage reporting lines and team assignments
-                </span>
+                <span>Manage reporting lines and team assignments</span>
                 <b>Manage people →</b>
               </button>
 
-              <button
-                type="button"
-                (click)="openAdmin('policies')"
-              >
+              <button type="button" (click)="openAdmin('policies')">
                 <span class="shortcut-icon">02</span>
                 <strong>Leave policies</strong>
-                <span>
-                  Configure allowances and team coverage rules
-                </span>
+                <span>Configure allowances and team coverage rules</span>
                 <b>Manage policies →</b>
               </button>
 
-              <button
-                type="button"
-                (click)="openAdmin('holidays')"
-              >
+              <button type="button" (click)="openAdmin('holidays')">
                 <span class="shortcut-icon">03</span>
                 <strong>Company holidays</strong>
-                <span>
-                  Keep everyone’s working calendar aligned
-                </span>
+                <span>Keep everyone’s working calendar aligned</span>
                 <b>Manage holidays →</b>
               </button>
             </div>
 
             <section class="workspace-note">
               <span class="note-symbol" aria-hidden="true">✦</span>
-
               <div>
                 <h3>A well-organised workplace starts here.</h3>
                 <p>
@@ -255,7 +231,6 @@
                 <article class="metric">
                   <span>Awaiting your review</span>
                   <strong>{{ pendingTeamRequests().length }}</strong>
-
                   <button
                     class="text-button"
                     type="button"
@@ -274,7 +249,6 @@
                 <article class="metric metric-accent">
                   <span>Plan with confidence</span>
                   <h3>See who’s available.</h3>
-
                   <button
                     class="text-button"
                     type="button"
@@ -304,7 +278,6 @@
                 (ngSubmit)="refresh()"
               >
                 <label for="year">Year</label>
-
                 <input
                   id="year"
                   name="year"
@@ -315,7 +288,6 @@
                   required
                   [disabled]="isWorking()"
                 />
-
                 <button
                   class="secondary"
                   type="submit"
@@ -340,7 +312,6 @@
                     <span class="balance-symbol">
                       {{ balance.name.slice(0, 1) }}
                     </span>
-
                     <h3>{{ balance.name }}</h3>
                     <span class="balance-year">{{ year }}</span>
                   </div>
@@ -366,12 +337,10 @@
                       <dt>Allowance</dt>
                       <dd>{{ balance.allowance }}</dd>
                     </div>
-
                     <div>
                       <dt>Pending</dt>
                       <dd>{{ balance.pending }}</dd>
                     </div>
-
                     <div>
                       <dt>Approved</dt>
                       <dd>{{ balance.approved }}</dd>
@@ -400,7 +369,6 @@
                           : 'Recent requests'
                       }}
                     </h2>
-
                     <p>
                       {{
                         currentUser.role === 'MANAGER'
@@ -439,7 +407,6 @@
                         <span class="activity-icon">
                           {{ request.user.name.slice(0, 1) }}
                         </span>
-
                         <span>
                           <strong>{{ request.user.name }}</strong>
                           <small>
@@ -447,7 +414,6 @@
                             · {{ request.days }} days
                           </small>
                         </span>
-
                         <span class="status pending">Pending</span>
                       </button>
                     } @empty {
@@ -467,20 +433,14 @@
                         (click)="openAudit(request.id)"
                         [disabled]="isWorking()"
                       >
-                        <span class="activity-icon" aria-hidden="true">
-                          ↗
-                        </span>
-
+                        <span class="activity-icon" aria-hidden="true">↗</span>
                         <span>
-                          <strong>
-                            {{ request.leaveType.name }} leave
-                          </strong>
+                          <strong>{{ request.leaveType.name }} leave</strong>
                           <small>
                             {{ request.startDate.slice(0, 10) }}
                             · {{ request.days }} days
                           </small>
                         </span>
-
                         <span
                           class="status"
                           [class.pending]="request.status === 'PENDING'"
@@ -508,16 +468,11 @@
                   <span class="upcoming-date">
                     {{ next.startDate.slice(8, 10) }}
                   </span>
-
-                  <h3>
-                    {{ next.startDate | date:'MMMM yyyy':'UTC' }}
-                  </h3>
-
+                  <h3>{{ next.startDate | date:'MMMM yyyy':'UTC' }}</h3>
                   <p>
                     {{ next.leaveType.name }}
                     · {{ next.days }} working days
                   </p>
-
                   <span class="status approved">Approved</span>
                 } @else {
                   <div class="upcoming-art" aria-hidden="true">☀</div>
@@ -553,15 +508,11 @@
                     track holiday.date
                   ) {
                     <article>
-                      <span>
-                        {{ holiday.date | date:'dd MMM':'UTC' }}
-                      </span>
+                      <span>{{ holiday.date | date:'dd MMM':'UTC' }}</span>
                       <strong>{{ holiday.name }}</strong>
                     </article>
                   } @empty {
-                    <p class="muted">
-                      No upcoming public holidays listed.
-                    </p>
+                    <p class="muted">No upcoming public holidays listed.</p>
                   }
                 </div>
               }
@@ -585,7 +536,6 @@
             >
               People & teams
             </button>
-
             <button
               type="button"
               [class.selected]="adminSection() === 'policies'"
@@ -593,7 +543,6 @@
             >
               Leave policies
             </button>
-
             <button
               type="button"
               [class.selected]="adminSection() === 'holidays'"
@@ -635,7 +584,6 @@
                 <h2>Team approvals</h2>
                 <p>Review leave requests from your direct reports.</p>
               </div>
-
               <button
                 type="button"
                 (click)="refresh()"
@@ -731,7 +679,6 @@
                     <th scope="col">History</th>
                   </tr>
                 </thead>
-
                 <tbody>
                   @for (
                     request of filteredTeamRequests();
@@ -740,15 +687,12 @@
                     <tr>
                       <td>{{ request.user.name }}</td>
                       <td>{{ request.leaveType.name }}</td>
-
                       <td>
                         {{ request.startDate.slice(0, 10) }}
                         → {{ request.endDate.slice(0, 10) }}
                       </td>
-
                       <td>{{ request.days }}</td>
                       <td class="reason-cell">{{ request.reason }}</td>
-
                       <td>
                         <span
                           class="status"
@@ -759,7 +703,6 @@
                           {{ request.status }}
                         </span>
                       </td>
-
                       <td>
                         @if (request.status === 'PENDING') {
                           <div class="decision-actions">
@@ -774,7 +717,6 @@
                             >
                               Approve
                             </button>
-
                             <button
                               class="reject-button"
                               type="button"
@@ -790,15 +732,12 @@
                           </div>
 
                           @if (decidingId() === request.id) {
-                            <span role="status">
-                              Saving decision…
-                            </span>
+                            <span role="status">Saving decision…</span>
                           }
                         } @else {
                           <span>—</span>
                         }
                       </td>
-
                       <td>
                         <button
                           class="secondary"
@@ -839,9 +778,7 @@
             <div class="calendar-heading">
               <div>
                 <h2>Team calendar</h2>
-                <p>
-                  Team leave on working days and public holidays.
-                </p>
+                <p>Team leave on working days and public holidays.</p>
               </div>
 
               <form
@@ -850,7 +787,6 @@
                 (ngSubmit)="loadCalendar()"
               >
                 <label for="calendarMonth">Month</label>
-
                 <input
                   id="calendarMonth"
                   name="calendarMonth"
@@ -861,24 +797,17 @@
                   required
                   [disabled]="isWorking()"
                 />
-
                 <button
                   type="submit"
                   [disabled]="calendarForm.invalid || isWorking()"
                 >
-                  {{
-                    calendarLoading()
-                      ? 'Loading…'
-                      : 'Show calendar'
-                  }}
+                  {{ calendarLoading() ? 'Loading…' : 'Show calendar' }}
                 </button>
               </form>
             </div>
 
             @if (calendarError()) {
-              <p class="error" role="alert">
-                {{ calendarError() }}
-              </p>
+              <p class="error" role="alert">{{ calendarError() }}</p>
             }
 
             @if (calendarLoading()) {
@@ -893,9 +822,7 @@
               </div>
 
               @if (monthData.requests.length === 0) {
-                <p>
-                  No active leave requests overlap this month.
-                </p>
+                <p>No active leave requests overlap this month.</p>
               }
 
               <div
@@ -912,38 +839,19 @@
                     <div class="weekday">{{ weekday }}</div>
                   }
 
-                  @for (
-                    padding of calendarPadding();
-                    track padding
-                  ) {
-                    <div
-                      class="calendar-empty"
-                      aria-hidden="true"
-                    ></div>
+                  @for (padding of calendarPadding(); track padding) {
+                    <div class="calendar-empty" aria-hidden="true"></div>
                   }
 
                   @for (day of calendarDays(); track day.date) {
-                    <div
-                      class="calendar-day"
-                      [class.weekend]="day.weekend"
-                    >
-                      <time [attr.datetime]="day.date">
-                        {{ day.day }}
-                      </time>
+                    <div class="calendar-day" [class.weekend]="day.weekend">
+                      <time [attr.datetime]="day.date">{{ day.day }}</time>
 
-                      @for (
-                        holiday of day.holidays;
-                        track $index
-                      ) {
-                        <div class="holiday-label">
-                          {{ holiday }}
-                        </div>
+                      @for (holiday of day.holidays; track $index) {
+                        <div class="holiday-label">{{ holiday }}</div>
                       }
 
-                      @for (
-                        request of day.requests;
-                        track request.id
-                      ) {
+                      @for (request of day.requests; track request.id) {
                         <div
                           class="calendar-entry"
                           [class.pending]="request.status === 'PENDING'"
@@ -967,14 +875,11 @@
         ) {
           <section class="card request-form">
             <h2>Request leave</h2>
-            <p>
-              Weekends and public holidays do not count as leave days.
-            </p>
+            <p>Weekends and public holidays do not count as leave days.</p>
 
             <form #leaveForm="ngForm" (ngSubmit)="submitLeave()">
               <fieldset [disabled]="isWorking()">
                 <label for="leaveType">Leave type</label>
-
                 <select
                   id="leaveType"
                   name="leaveType"
@@ -982,14 +887,11 @@
                   required
                 >
                   @for (type of leaveTypes(); track type.id) {
-                    <option [ngValue]="type.id">
-                      {{ type.name }}
-                    </option>
+                    <option [ngValue]="type.id">{{ type.name }}</option>
                   }
                 </select>
 
                 <label for="startDate">Start date</label>
-
                 <input
                   id="startDate"
                   name="startDate"
@@ -999,7 +901,6 @@
                 />
 
                 <label for="endDate">End date</label>
-
                 <input
                   id="endDate"
                   name="endDate"
@@ -1010,7 +911,6 @@
                 />
 
                 <label for="reason">Reason</label>
-
                 <textarea
                   id="reason"
                   name="reason"
@@ -1029,11 +929,7 @@
                     isWorking()
                   "
                 >
-                  {{
-                    submitting()
-                      ? 'Submitting…'
-                      : 'Submit request'
-                  }}
+                  {{ submitting() ? 'Submitting…' : 'Submit request' }}
                 </button>
               </fieldset>
             </form>
@@ -1048,11 +944,8 @@
             <div class="welcome">
               <div>
                 <h2>My requests</h2>
-                <p>
-                  All years · Pending and approved leave can be cancelled.
-                </p>
+                <p>All years · Pending and approved leave can be cancelled.</p>
               </div>
-
               <button
                 type="button"
                 (click)="refresh()"
@@ -1065,7 +958,6 @@
             <div class="request-filters">
               <div>
                 <label for="historySearch">Search</label>
-
                 <input
                   id="historySearch"
                   type="search"
@@ -1077,7 +969,6 @@
 
               <div>
                 <label for="historyStatus">Status</label>
-
                 <select
                   id="historyStatus"
                   [ngModel]="historyStatus()"
@@ -1093,7 +984,6 @@
 
               <div>
                 <label for="historyFrom">From</label>
-
                 <input
                   id="historyFrom"
                   type="date"
@@ -1104,7 +994,6 @@
 
               <div>
                 <label for="historyTo">To</label>
-
                 <input
                   id="historyTo"
                   type="date"
@@ -1150,22 +1039,15 @@
                     <th scope="col">History</th>
                   </tr>
                 </thead>
-
                 <tbody>
-                  @for (
-                    request of filteredRequests();
-                    track request.id
-                  ) {
+                  @for (request of filteredRequests(); track request.id) {
                     <tr>
                       <td>{{ request.leaveType.name }}</td>
-
                       <td>
                         {{ request.startDate.slice(0, 10) }}
                         → {{ request.endDate.slice(0, 10) }}
                       </td>
-
                       <td>{{ request.days }}</td>
-
                       <td>
                         <span
                           class="status"
@@ -1176,7 +1058,6 @@
                           {{ request.status }}
                         </span>
                       </td>
-
                       <td>
                         @if (
                           request.status === 'PENDING' ||
@@ -1187,9 +1068,7 @@
                             type="button"
                             (click)="cancelRequest(request.id)"
                             [disabled]="isWorking()"
-                            [attr.aria-label]="
-                              'Cancel request ' + request.id
-                            "
+                            [attr.aria-label]="'Cancel request ' + request.id"
                           >
                             {{
                               cancellingId() === request.id
@@ -1201,7 +1080,6 @@
                           <span>—</span>
                         }
                       </td>
-
                       <td>
                         <button
                           class="secondary"
@@ -1237,7 +1115,6 @@
           <aside class="auth-story">
             <a class="workspace-brand" href="/">
               <span class="brand-icon">c<span>:</span></span>
-
               <span>
                 cardinality
                 <small>PEOPLE WORKSPACE</small>
@@ -1248,12 +1125,10 @@
               <span class="eyebrow">
                 A LITTLE SPACE. A BETTER WORKDAY.
               </span>
-
               <h1>
                 Good work.<br />
                 Great balance<span>.</span>
               </h1>
-
               <p>
                 Plan your time away. Keep your team connected.
                 Come back recharged.
@@ -1261,11 +1136,9 @@
 
               <div class="story-illustration" aria-hidden="true">
                 <div class="orb"></div>
-
                 <div class="illustration-card">
                   <span>YOUR NEXT CHAPTER</span>
                   <strong>Room to recharge.</strong>
-
                   <div class="mini-week">
                     <i>M</i>
                     <i>T</i>
@@ -1273,7 +1146,6 @@
                     <i>T</i>
                     <i>F</i>
                   </div>
-
                   <div class="mini-days">
                     <i>12</i>
                     <i>13</i>
@@ -1282,10 +1154,7 @@
                     <i>16</i>
                   </div>
                 </div>
-
-                <span class="floating-note">
-                  ✦ Make time for you.
-                </span>
+                <span class="floating-note">✦ Make time for you.</span>
               </div>
             </div>
 
@@ -1314,7 +1183,6 @@
 
                   <form #loginForm="ngForm" (ngSubmit)="login()">
                     <label for="email">Email</label>
-
                     <input
                       id="email"
                       name="email"
@@ -1327,7 +1195,6 @@
                     />
 
                     <label for="password">Password</label>
-
                     <input
                       id="password"
                       name="password"
@@ -1344,11 +1211,7 @@
                       (click)="showPassword.set(!showPassword())"
                       [attr.aria-pressed]="showPassword()"
                     >
-                      {{
-                        showPassword()
-                          ? 'Hide password'
-                          : 'Show password'
-                      }}
+                      {{ showPassword() ? 'Hide password' : 'Show password' }}
                     </button>
 
                     <button
@@ -1375,7 +1238,6 @@
                   </button>
 
                   <p>Don't have an account?</p>
-
                   <button
                     class="secondary"
                     type="button"
@@ -1404,3 +1266,11 @@
 }
 
 <router-outlet></router-outlet>
+
+@if (user(); as assistantUser) {
+  @for (assistantUserId of [assistantUser.id]; track assistantUserId) {
+    <app-leave-assistant
+      [role]="assistantUser.role"
+    ></app-leave-assistant>
+  }
+}
