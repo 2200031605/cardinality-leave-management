@@ -326,3 +326,8 @@ Prepare a recording under five minutes showing:
 - Manager decisions, calendar, availability and chart
 - Administrator configuration
 - The three-option Leave Assistant
+
+## Demo Recording
+
+[Watch the demo](https://drive.google.com/file/d/1M6NZRT51hR-xZoDuf50qnWf2d8aybSuK/view?usp=sharing)
+
