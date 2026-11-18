@@ -23,6 +23,7 @@ import { Signup } from './signup';
 import { EmployeeAdmin } from './employee-admin';
 import { ForgotPassword } from './forgot-password';
 import { TeamAvailabilityComponent } from './team-availability';
+import { TeamLeaveChart } from './team-leave-chart';
 
 import type {
   CalendarRequest,
@@ -67,6 +68,7 @@ interface CalendarDay {
     EmployeeAdmin,
     ForgotPassword,
     TeamAvailabilityComponent,
+    TeamLeaveChart,
   ],
   templateUrl: './app.html',
   styleUrl: './app.scss',
@@ -705,14 +707,8 @@ export class App {
               ? []
               : calendar.requests.filter(
                   (request) =>
-                    request.startDate.slice(
-                      0,
-                      10,
-                    ) <= key &&
-                    request.endDate.slice(
-                      0,
-                      10,
-                    ) >= key,
+                    request.startDate.slice(0, 10) <= key &&
+                    request.endDate.slice(0, 10) >= key,
                 );
 
           days.push({
