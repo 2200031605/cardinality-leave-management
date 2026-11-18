@@ -1,782 +1,1278 @@
-<main class="shell">
-  <header class="header">
-    <div>
-      <span class="brand">CARDINALITY</span>
-      <h1>Leave Management</h1>
-    </div>
-
-    @if (user()) {
-      <button
-        class="secondary"
-        type="button"
-        (click)="logout()"
-        [disabled]="isWorking()"
-      >
-        Sign out
-      </button>
-    }
-  </header>
-
-  @if (user(); as currentUser) {
-    <nav class="navigation" aria-label="Main navigation">
-      <button
-        type="button"
-        [class.active]="activeTab() === 'dashboard'"
-        [attr.aria-current]="activeTab() === 'dashboard' ? 'page' : null"
-        (click)="activeTab.set('dashboard')"
-      >
-        Dashboard
-      </button>
-
-      @if (currentUser.role !== 'ADMIN') {
-        <button
-          type="button"
-          [class.active]="activeTab() === 'request'"
-          [attr.aria-current]="activeTab() === 'request' ? 'page' : null"
-          (click)="activeTab.set('request')"
+@if (!historyPage()) {
+  <main class="shell" [class.signed-in]="!!user()">
+    @if (user(); as currentUser) {
+      <aside class="sidebar" [class.mobile-open]="mobileMenuOpen()">
+        <a
+          class="workspace-brand"
+          href="/"
+          (click)="$event.preventDefault(); navigateTab('dashboard')"
         >
-          Request Leave
-        </button>
+          <span class="brand-icon">c<span>:</span></span>
+          <span>
+            cardinality
+            <small>PEOPLE WORKSPACE</small>
+          </span>
+        </a>
 
-        <button
-          type="button"
-          [class.active]="activeTab() === 'history'"
-          [attr.aria-current]="activeTab() === 'history' ? 'page' : null"
-          (click)="activeTab.set('history')"
-        >
-          My Requests
-        </button>
+        <p class="nav-label">WORKSPACE</p>
 
-        <button
-          type="button"
-          [class.active]="activeTab() === 'calendar'"
-          [attr.aria-current]="activeTab() === 'calendar' ? 'page' : null"
-          (click)="activeTab.set('calendar')"
-        >
-          Team Calendar
-        </button>
-      }
-
-      @if (currentUser.role === 'MANAGER') {
-        <button
-          type="button"
-          [class.active]="activeTab() === 'approvals'"
-          [attr.aria-current]="activeTab() === 'approvals' ? 'page' : null"
-          (click)="activeTab.set('approvals')"
-        >
-          Approvals
-        </button>
-      }
-
-      @if (currentUser.role === 'ADMIN') {
-        <button
-          type="button"
-          [class.active]="activeTab() === 'admin'"
-          [attr.aria-current]="activeTab() === 'admin' ? 'page' : null"
-          (click)="activeTab.set('admin')"
-        >
-          Administration
-        </button>
-      }
-    </nav>
-  }
-
-  @if (error()) {
-    <p class="error" role="alert">{{ error() }}</p>
-  }
-
-  @if (success()) {
-    <p class="success" role="status">{{ success() }}</p>
-  }
-
-  @if (user(); as currentUser) {
-    @if (activeTab() === 'dashboard') {
-      <section class="welcome">
-        <div>
-          <h2>Welcome, {{ currentUser.name }}</h2>
-          <p>{{ currentUser.role }} · Your leave balance at a glance</p>
-        </div>
-
-        <form
-          class="year-form"
-          #yearForm="ngForm"
-          (ngSubmit)="refresh()"
-        >
-          <label for="year">Balance year</label>
-
-          <input
-            id="year"
-            name="year"
-            type="number"
-            [(ngModel)]="year"
-            min="1900"
-            max="9999"
-            required
-            [disabled]="isWorking()"
-          />
-
-          <button
-            type="submit"
-            [disabled]="yearForm.invalid || isWorking()"
-          >
-            {{ busy() ? 'Loading…' : 'Refresh' }}
-          </button>
-        </form>
-      </section>
-
-      <section class="balances" aria-label="Leave balances">
-        @for (balance of balances(); track balance.leaveTypeId) {
-          <article class="card">
-            <h3>{{ balance.name }}</h3>
-
-            <div class="remaining">
-              {{ balance.remaining }}
-              <span>days remaining</span>
-            </div>
-
-            <div
-              class="bar"
-              role="img"
-              [attr.aria-label]="
-                balance.pending + balance.approved +
-                ' days reserved out of ' + balance.allowance
-              "
-            >
-              <div [style.width.%]="usedPercent(balance)"></div>
-            </div>
-
-            <dl>
-              <div>
-                <dt>Allowance</dt>
-                <dd>{{ balance.allowance }}</dd>
-              </div>
-              <div>
-                <dt>Pending</dt>
-                <dd>{{ balance.pending }}</dd>
-              </div>
-              <div>
-                <dt>Approved</dt>
-                <dd>{{ balance.approved }}</dd>
-              </div>
-            </dl>
-          </article>
-        } @empty {
-          <p>
-            {{ busy() ? 'Loading balances…' : 'No balances to display.' }}
-          </p>
-        }
-      </section>
-    }
-
-    @if (currentUser.role === 'ADMIN' && activeTab() === 'admin') {
-      <app-employee-admin></app-employee-admin>
-
-      <app-admin-settings
-        (changed)="loadDashboard()"
-      ></app-admin-settings>
-
-      <app-holiday-admin></app-holiday-admin>
-    }
-
-    @if (
-      currentUser.role === 'MANAGER' &&
-      activeTab() === 'approvals'
-    ) {
-      <section class="card history">
-        <div class="welcome">
-          <div>
-            <h2>Team approvals</h2>
-            <p>Review leave requests from your direct reports.</p>
-          </div>
-
+        <nav class="navigation" aria-label="Main navigation">
           <button
             type="button"
-            (click)="refresh()"
-            [disabled]="isWorking()"
+            data-nav="dashboard"
+            [class.active]="activeTab() === 'dashboard'"
+            [attr.aria-current]="activeTab() === 'dashboard' ? 'page' : null"
+            (click)="navigateTab('dashboard')"
           >
-            {{ busy() ? 'Loading…' : 'Refresh' }}
+            Dashboard
           </button>
-        </div>
 
-        <div class="request-filters">
-          <div>
-            <label for="approvalSearch">Search</label>
-            <input
-              id="approvalSearch"
-              type="search"
-              placeholder="Employee, email, type, reason…"
-              [ngModel]="approvalSearch()"
-              (ngModelChange)="approvalSearch.set($event)"
-            />
-          </div>
-
-          <div>
-            <label for="approvalStatus">Status</label>
-            <select
-              id="approvalStatus"
-              [ngModel]="approvalStatus()"
-              (ngModelChange)="approvalStatus.set($event)"
+          @if (currentUser.role !== 'ADMIN') {
+            <button
+              type="button"
+              data-nav="request"
+              [class.active]="activeTab() === 'request'"
+              [attr.aria-current]="activeTab() === 'request' ? 'page' : null"
+              (click)="navigateTab('request')"
             >
-              <option value="ALL">All statuses</option>
-              <option value="PENDING">Pending</option>
-              <option value="APPROVED">Approved</option>
-              <option value="REJECTED">Rejected</option>
-              <option value="CANCELLED">Cancelled</option>
-            </select>
-          </div>
-
-          <div>
-            <label for="approvalFrom">From</label>
-            <input
-              id="approvalFrom"
-              type="date"
-              [ngModel]="approvalFrom()"
-              (ngModelChange)="approvalFrom.set($event)"
-            />
-          </div>
-
-          <div>
-            <label for="approvalTo">To</label>
-            <input
-              id="approvalTo"
-              type="date"
-              [min]="approvalFrom()"
-              [ngModel]="approvalTo()"
-              (ngModelChange)="approvalTo.set($event)"
-            />
-          </div>
-
-          <button
-            class="secondary"
-            type="button"
-            (click)="clearApprovalFilters()"
-          >
-            Clear
-          </button>
-        </div>
-
-        @if (
-          approvalFrom() &&
-          approvalTo() &&
-          approvalFrom() > approvalTo()
-        ) {
-          <p class="error" role="alert">
-            From date cannot be after To date.
-          </p>
-        }
-
-        <p role="status">
-          Showing {{ filteredTeamRequests().length }}
-          of {{ teamRequests().length }} requests
-        </p>
-
-        <div class="table-scroll">
-          <table>
-            <thead>
-              <tr>
-                <th scope="col">Employee</th>
-                <th scope="col">Type</th>
-                <th scope="col">Dates</th>
-                <th scope="col">Days</th>
-                <th scope="col">Reason</th>
-                <th scope="col">Status</th>
-                <th scope="col">Actions</th>
-              </tr>
-            </thead>
-
-            <tbody>
-              @for (request of filteredTeamRequests(); track request.id) {
-                <tr>
-                  <td>{{ request.user.name }}</td>
-                  <td>{{ request.leaveType.name }}</td>
-                  <td>
-                    {{ request.startDate.slice(0, 10) }}
-                    →
-                    {{ request.endDate.slice(0, 10) }}
-                  </td>
-                  <td>{{ request.days }}</td>
-                  <td class="reason-cell">{{ request.reason }}</td>
-
-                  <td>
-                    <span
-                      class="status"
-                      [class.pending]="request.status === 'PENDING'"
-                      [class.approved]="request.status === 'APPROVED'"
-                      [class.rejected]="request.status === 'REJECTED'"
-                    >
-                      {{ request.status }}
-                    </span>
-                  </td>
-
-                  <td>
-                    @if (request.status === 'PENDING') {
-                      <div class="decision-actions">
-                        <button
-                          type="button"
-                          (click)="decideRequest(request.id, 'APPROVED')"
-                          [disabled]="isWorking()"
-                          [attr.aria-label]="
-                            'Approve request ' + request.id +
-                            ' from ' + request.user.name
-                          "
-                        >
-                          Approve
-                        </button>
-
-                        <button
-                          class="reject-button"
-                          type="button"
-                          (click)="decideRequest(request.id, 'REJECTED')"
-                          [disabled]="isWorking()"
-                          [attr.aria-label]="
-                            'Reject request ' + request.id +
-                            ' from ' + request.user.name
-                          "
-                        >
-                          Reject
-                        </button>
-                      </div>
-
-                      @if (decidingId() === request.id) {
-                        <span role="status">Saving decision…</span>
-                      }
-                    } @else {
-                      <span>—</span>
-                    }
-                  </td>
-                </tr>
-              } @empty {
-                <tr>
-                  <td colspan="7">
-                    {{
-                      busy()
-                        ? 'Loading team requests…'
-                        : 'No requests match your filters.'
-                    }}
-                  </td>
-                </tr>
-              }
-            </tbody>
-          </table>
-        </div>
-      </section>
-    }
-
-    @if (
-      currentUser.role !== 'ADMIN' &&
-      activeTab() === 'calendar'
-    ) {
-      <section class="card team-calendar">
-        <div class="calendar-heading">
-          <div>
-            <h2>Team calendar</h2>
-            <p>Team leave on working days and public holidays.</p>
-          </div>
-
-          <form
-            class="calendar-controls"
-            #calendarForm="ngForm"
-            (ngSubmit)="loadCalendar()"
-          >
-            <label for="calendarMonth">Month</label>
-
-            <input
-              id="calendarMonth"
-              name="calendarMonth"
-              type="month"
-              [(ngModel)]="calendarMonth"
-              min="1900-01"
-              max="9999-12"
-              required
-              [disabled]="isWorking()"
-            />
+              Request leave
+            </button>
 
             <button
-              type="submit"
-              [disabled]="calendarForm.invalid || isWorking()"
+              type="button"
+              data-nav="history"
+              [class.active]="activeTab() === 'history'"
+              [attr.aria-current]="activeTab() === 'history' ? 'page' : null"
+              (click)="navigateTab('history')"
             >
-              {{ calendarLoading() ? 'Loading…' : 'Show calendar' }}
+              My requests
             </button>
-          </form>
-        </div>
 
-        @if (calendarError()) {
-          <p class="error" role="alert">{{ calendarError() }}</p>
-        }
-
-        @if (calendarLoading()) {
-          <p role="status">Loading calendar…</p>
-        }
-
-        @if (calendar(); as monthData) {
-          <div class="calendar-legend">
-            <span class="status pending">PENDING</span>
-            <span class="status approved">APPROVED</span>
-            <span class="holiday-label">PUBLIC HOLIDAY</span>
-          </div>
-
-          @if (monthData.requests.length === 0) {
-            <p>No active leave requests overlap this month.</p>
+            <button
+              type="button"
+              data-nav="calendar"
+              [class.active]="activeTab() === 'calendar'"
+              [attr.aria-current]="activeTab() === 'calendar' ? 'page' : null"
+              (click)="navigateTab('calendar')"
+            >
+              Team calendar
+            </button>
           }
 
-          <div
-            class="calendar-scroll"
-            tabindex="0"
-            role="region"
-            aria-label="Monthly team calendar"
+          @if (currentUser.role === 'MANAGER') {
+            <button
+              type="button"
+              data-nav="availability"
+              [class.active]="activeTab() === 'availability'"
+              [attr.aria-current]="
+                activeTab() === 'availability' ? 'page' : null
+              "
+              (click)="navigateTab('availability')"
+            >
+              Team availability
+            </button>
+
+            <button
+              type="button"
+              data-nav="approvals"
+              [class.active]="activeTab() === 'approvals'"
+              [attr.aria-current]="activeTab() === 'approvals' ? 'page' : null"
+              (click)="navigateTab('approvals')"
+            >
+              Approvals
+            </button>
+          }
+
+          @if (currentUser.role === 'ADMIN') {
+            <button
+              type="button"
+              data-nav="admin"
+              [class.active]="activeTab() === 'admin'"
+              [attr.aria-current]="activeTab() === 'admin' ? 'page' : null"
+              (click)="navigateTab('admin')"
+            >
+              Administration
+            </button>
+          }
+        </nav>
+
+        <div class="sidebar-bottom">
+          <span class="avatar">{{ initials() }}</span>
+          <div>
+            <strong>{{ currentUser.name }}</strong>
+            <small>{{ currentUser.role }}</small>
+          </div>
+        </div>
+      </aside>
+
+      <header class="topbar">
+        <div class="topbar-title">
+          <button
+            class="menu-toggle secondary"
+            type="button"
+            (click)="mobileMenuOpen.set(!mobileMenuOpen())"
+            [attr.aria-expanded]="mobileMenuOpen()"
+            aria-label="Toggle navigation"
           >
-            <div class="calendar-grid">
-              @for (
-                weekday of ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-                track weekday
-              ) {
-                <div class="weekday">{{ weekday }}</div>
-              }
+            ☰
+          </button>
 
-              @for (padding of calendarPadding(); track padding) {
-                <div class="calendar-empty" aria-hidden="true"></div>
-              }
+          <span>
+            Workspace
+            <span class="breadcrumb-divider">/</span>
+            <strong>{{ pageTitle() }}</strong>
+          </span>
+        </div>
 
-              @for (day of calendarDays(); track day.date) {
-                <div
-                  class="calendar-day"
-                  [class.weekend]="day.weekend"
+        <div class="topbar-user">
+          <span class="role-pill">{{ currentUser.role }}</span>
+          <span class="avatar">{{ initials() }}</span>
+
+          <button
+            class="text-button"
+            type="button"
+            (click)="logout()"
+            [disabled]="isWorking()"
+          >
+            Sign out
+          </button>
+        </div>
+      </header>
+
+      @if (mobileMenuOpen()) {
+        <button
+          class="menu-backdrop"
+          type="button"
+          aria-label="Close navigation"
+          (click)="mobileMenuOpen.set(false)"
+        ></button>
+      }
+    }
+
+    <div
+      class="page-content"
+      [class.auth-page]="!user()"
+      id="main-content"
+    >
+      @if (error()) {
+        <p class="error" role="alert">{{ error() }}</p>
+      }
+
+      @if (success()) {
+        <p class="success" role="status">{{ success() }}</p>
+      }
+
+      @if (user(); as currentUser) {
+        @if (activeTab() === 'dashboard') {
+          <section class="page-intro">
+            <div>
+              <span class="eyebrow">YOUR WORKSPACE, AT A GLANCE</span>
+
+              <h1>
+                {{ greeting() }}, {{ firstName() }}
+                <span class="greeting-dot">.</span>
+              </h1>
+
+              <p>
+                {{
+                  currentUser.role === 'MANAGER'
+                    ? 'A little clarity for your team’s time away.'
+                    : currentUser.role === 'ADMIN'
+                      ? 'Keep your people, policies and time off connected.'
+                      : 'Make room for what matters. Your time off starts here.'
+                }}
+              </p>
+            </div>
+
+            @if (currentUser.role !== 'ADMIN') {
+              <button
+                type="button"
+                (click)="navigateTab('request')"
+                [disabled]="isWorking()"
+              >
+                + Request leave
+              </button>
+            }
+          </section>
+
+          @if (currentUser.role === 'ADMIN') {
+            <div class="admin-shortcuts">
+              <button type="button" (click)="openAdmin('employees')">
+                <span class="shortcut-icon">01</span>
+                <strong>People & teams</strong>
+                <span>Manage reporting lines and team assignments</span>
+                <b>Manage people →</b>
+              </button>
+
+              <button type="button" (click)="openAdmin('policies')">
+                <span class="shortcut-icon">02</span>
+                <strong>Leave policies</strong>
+                <span>Configure allowances and team coverage rules</span>
+                <b>Manage policies →</b>
+              </button>
+
+              <button type="button" (click)="openAdmin('holidays')">
+                <span class="shortcut-icon">03</span>
+                <strong>Company holidays</strong>
+                <span>Keep everyone’s working calendar aligned</span>
+                <b>Manage holidays →</b>
+              </button>
+            </div>
+
+            <section class="workspace-note">
+              <span class="note-symbol" aria-hidden="true">✦</span>
+              <div>
+                <h3>A well-organised workplace starts here.</h3>
+                <p>
+                  Assign each employee to a team and manager,
+                  then keep your leave policies up to date.
+                </p>
+              </div>
+            </section>
+          } @else {
+            @if (currentUser.role === 'MANAGER') {
+              <div class="manager-overview">
+                <article class="metric">
+                  <span>Awaiting your review</span>
+                  <strong>{{ pendingTeamRequests().length }}</strong>
+                  <button
+                    class="text-button"
+                    type="button"
+                    (click)="navigateTab('approvals')"
+                  >
+                    Review requests →
+                  </button>
+                </article>
+
+                <article class="metric">
+                  <span>Approved team requests</span>
+                  <strong>{{ approvedTeamCount() }}</strong>
+                  <span>Across all recorded years</span>
+                </article>
+
+                <article class="metric metric-accent">
+                  <span>Plan with confidence</span>
+                  <h3>See who’s available.</h3>
+                  <button
+                    class="text-button"
+                    type="button"
+                    (click)="navigateTab('availability')"
+                  >
+                    Check team availability →
+                  </button>
+                </article>
+              </div>
+            }
+
+            <div class="section-title">
+              <div>
+                <h2>Your leave balance</h2>
+                <p>Pending requests reserve your balance.</p>
+              </div>
+
+              <form
+                class="year-form"
+                #yearForm="ngForm"
+                (ngSubmit)="refresh()"
+              >
+                <label for="year">Year</label>
+                <input
+                  id="year"
+                  name="year"
+                  type="number"
+                  [(ngModel)]="year"
+                  min="1900"
+                  max="9999"
+                  required
+                  [disabled]="isWorking()"
+                />
+                <button
+                  class="secondary"
+                  type="submit"
+                  [disabled]="yearForm.invalid || isWorking()"
                 >
-                  <time [attr.datetime]="day.date">{{ day.day }}</time>
+                  {{ busy() ? 'Loading…' : 'Refresh' }}
+                </button>
+              </form>
+            </div>
 
-                  @for (holiday of day.holidays; track $index) {
-                    <div class="holiday-label">{{ holiday }}</div>
-                  }
+            <section class="balances" aria-label="Leave balances">
+              @for (
+                balance of balances();
+                track balance.leaveTypeId;
+                let i = $index
+              ) {
+                <article
+                  class="card balance-card"
+                  [attr.data-tone]="i % 3"
+                >
+                  <div class="balance-heading">
+                    <span class="balance-symbol">
+                      {{ balance.name.slice(0, 1) }}
+                    </span>
+                    <h3>{{ balance.name }}</h3>
+                    <span class="balance-year">{{ year }}</span>
+                  </div>
 
-                  @for (request of day.requests; track request.id) {
-                    <div
-                      class="calendar-entry"
-                      [class.pending]="request.status === 'PENDING'"
-                      [class.approved]="request.status === 'APPROVED'"
-                    >
-                      <strong>{{ request.user.name }}</strong>
-                      <small>{{ request.status }}</small>
+                  <div class="remaining">
+                    {{ balance.remaining }}
+                    <span>days available</span>
+                  </div>
+
+                  <div
+                    class="bar"
+                    role="img"
+                    [attr.aria-label]="
+                      balance.pending + balance.approved +
+                      ' days reserved out of ' + balance.allowance
+                    "
+                  >
+                    <div [style.width.%]="usedPercent(balance)"></div>
+                  </div>
+
+                  <dl>
+                    <div>
+                      <dt>Allowance</dt>
+                      <dd>{{ balance.allowance }}</dd>
                     </div>
+                    <div>
+                      <dt>Pending</dt>
+                      <dd>{{ balance.pending }}</dd>
+                    </div>
+                    <div>
+                      <dt>Approved</dt>
+                      <dd>{{ balance.approved }}</dd>
+                    </div>
+                  </dl>
+                </article>
+              } @empty {
+                <div class="empty-state">
+                  {{
+                    busy()
+                      ? 'Loading your balances…'
+                      : 'No leave balances configured yet.'
+                  }}
+                </div>
+              }
+            </section>
+
+            <div class="dashboard-grid">
+              <section class="card">
+                <div class="section-title">
+                  <div>
+                    <h2>
+                      {{
+                        currentUser.role === 'MANAGER'
+                          ? 'Needs your attention'
+                          : 'Recent requests'
+                      }}
+                    </h2>
+                    <p>
+                      {{
+                        currentUser.role === 'MANAGER'
+                          ? 'Pending requests from your direct reports.'
+                          : 'Your latest time-off activity.'
+                      }}
+                    </p>
+                  </div>
+
+                  <button
+                    class="text-button"
+                    type="button"
+                    (click)="
+                      navigateTab(
+                        currentUser.role === 'MANAGER'
+                          ? 'approvals'
+                          : 'history'
+                      )
+                    "
+                  >
+                    View all →
+                  </button>
+                </div>
+
+                <div class="activity-list">
+                  @if (currentUser.role === 'MANAGER') {
+                    @for (
+                      request of pendingTeamRequests().slice(0, 4);
+                      track request.id
+                    ) {
+                      <button
+                        class="activity-row"
+                        type="button"
+                        (click)="navigateTab('approvals')"
+                      >
+                        <span class="activity-icon">
+                          {{ request.user.name.slice(0, 1) }}
+                        </span>
+                        <span>
+                          <strong>{{ request.user.name }}</strong>
+                          <small>
+                            {{ request.startDate.slice(0, 10) }}
+                            · {{ request.days }} days
+                          </small>
+                        </span>
+                        <span class="status pending">Pending</span>
+                      </button>
+                    } @empty {
+                      <div class="empty-state">
+                        <strong>All caught up.</strong>
+                        <p>No pending team requests to review.</p>
+                      </div>
+                    }
+                  } @else {
+                    @for (
+                      request of requests().slice(0, 4);
+                      track request.id
+                    ) {
+                      <button
+                        class="activity-row"
+                        type="button"
+                        (click)="openAudit(request.id)"
+                        [disabled]="isWorking()"
+                      >
+                        <span class="activity-icon" aria-hidden="true">
+                          ↗
+                        </span>
+                        <span>
+                          <strong>{{ request.leaveType.name }} leave</strong>
+                          <small>
+                            {{ request.startDate.slice(0, 10) }}
+                            · {{ request.days }} days
+                          </small>
+                        </span>
+                        <span
+                          class="status"
+                          [class.pending]="request.status === 'PENDING'"
+                          [class.approved]="request.status === 'APPROVED'"
+                          [class.rejected]="request.status === 'REJECTED'"
+                        >
+                          {{ request.status }}
+                        </span>
+                      </button>
+                    } @empty {
+                      <div class="empty-state">
+                        <strong>Your next break starts here.</strong>
+                        <p>Submit a request to see your activity.</p>
+                      </div>
+                    }
+                  }
+                </div>
+              </section>
+
+              <section class="card upcoming-card">
+                <span class="eyebrow">ON THE HORIZON</span>
+                <h2>Your next time off</h2>
+
+                @if (nextLeave(); as next) {
+                  <span class="upcoming-date">
+                    {{ next.startDate.slice(8, 10) }}
+                  </span>
+                  <h3>{{ next.startDate | date:'MMMM yyyy':'UTC' }}</h3>
+                  <p>
+                    {{ next.leaveType.name }}
+                    · {{ next.days }} working days
+                  </p>
+                  <span class="status approved">Approved</span>
+                } @else {
+                  <div class="upcoming-art" aria-hidden="true">☀</div>
+                  <h3>Something to look forward to.</h3>
+                  <p>
+                    No upcoming approved leave.
+                    Plan your next break when you’re ready.
+                  </p>
+                }
+
+                <button
+                  class="secondary"
+                  type="button"
+                  (click)="navigateTab('calendar')"
+                >
+                  Open team calendar →
+                </button>
+              </section>
+            </div>
+
+            <section class="card holiday-preview">
+              <div class="section-title">
+                <h2>Upcoming holidays</h2>
+                <span class="muted">Company calendar</span>
+              </div>
+
+              @if (holidayError()) {
+                <p class="muted">{{ holidayError() }}</p>
+              } @else {
+                <div class="holiday-strip">
+                  @for (
+                    holiday of upcomingHolidays();
+                    track holiday.date
+                  ) {
+                    <article>
+                      <span>{{ holiday.date | date:'dd MMM':'UTC' }}</span>
+                      <strong>{{ holiday.name }}</strong>
+                    </article>
+                  } @empty {
+                    <p class="muted">No upcoming public holidays listed.</p>
                   }
                 </div>
               }
-            </div>
-          </div>
+            </section>
+          }
         }
-      </section>
-    }
 
-    @if (
-      currentUser.role !== 'ADMIN' &&
-      activeTab() === 'request'
-    ) {
-      <section class="card request-form">
-        <h2>Request leave</h2>
-        <p>Weekends and public holidays do not count as leave days.</p>
-
-        <form #leaveForm="ngForm" (ngSubmit)="submitLeave()">
-          <fieldset [disabled]="isWorking()">
-            <label for="leaveType">Leave type</label>
-            <select
-              id="leaveType"
-              name="leaveType"
-              [(ngModel)]="leaveTypeId"
-              required
-            >
-              @for (type of leaveTypes(); track type.id) {
-                <option [ngValue]="type.id">{{ type.name }}</option>
-              }
-            </select>
-
-            <label for="startDate">Start date</label>
-            <input
-              id="startDate"
-              name="startDate"
-              type="date"
-              [(ngModel)]="startDate"
-              required
-            />
-
-            <label for="endDate">End date</label>
-            <input
-              id="endDate"
-              name="endDate"
-              type="date"
-              [(ngModel)]="endDate"
-              [min]="startDate"
-              required
-            />
-
-            <label for="reason">Reason</label>
-            <textarea
-              id="reason"
-              name="reason"
-              [(ngModel)]="reason"
-              minlength="3"
-              maxlength="1000"
-              rows="3"
-              required
-            ></textarea>
-
+        @if (currentUser.role === 'ADMIN' && activeTab() === 'admin') {
+          <div
+            class="section-tabs"
+            role="group"
+            aria-label="Administration sections"
+          >
             <button
-              type="submit"
-              [disabled]="
-                leaveForm.invalid ||
-                !leaveTypes().length ||
-                isWorking()
-              "
+              type="button"
+              [class.selected]="adminSection() === 'employees'"
+              (click)="adminSection.set('employees')"
             >
-              {{ submitting() ? 'Submitting…' : 'Submit request' }}
+              People & teams
             </button>
-          </fieldset>
-        </form>
-      </section>
-    }
-
-    @if (
-      currentUser.role !== 'ADMIN' &&
-      activeTab() === 'history'
-    ) {
-      <section class="card history">
-        <div class="welcome">
-          <div>
-            <h2>My requests</h2>
-            <p>All years · Pending and approved leave can be cancelled.</p>
-          </div>
-
-          <button
-            type="button"
-            (click)="refresh()"
-            [disabled]="isWorking()"
-          >
-            {{ busy() ? 'Loading…' : 'Refresh' }}
-          </button>
-        </div>
-
-        <div class="request-filters">
-          <div>
-            <label for="historySearch">Search</label>
-            <input
-              id="historySearch"
-              type="search"
-              placeholder="Leave type, reason, request ID…"
-              [ngModel]="historySearch()"
-              (ngModelChange)="historySearch.set($event)"
-            />
-          </div>
-
-          <div>
-            <label for="historyStatus">Status</label>
-            <select
-              id="historyStatus"
-              [ngModel]="historyStatus()"
-              (ngModelChange)="historyStatus.set($event)"
+            <button
+              type="button"
+              [class.selected]="adminSection() === 'policies'"
+              (click)="adminSection.set('policies')"
             >
-              <option value="ALL">All statuses</option>
-              <option value="PENDING">Pending</option>
-              <option value="APPROVED">Approved</option>
-              <option value="REJECTED">Rejected</option>
-              <option value="CANCELLED">Cancelled</option>
-            </select>
+              Leave policies
+            </button>
+            <button
+              type="button"
+              [class.selected]="adminSection() === 'holidays'"
+              (click)="adminSection.set('holidays')"
+            >
+              Public holidays
+            </button>
           </div>
 
-          <div>
-            <label for="historyFrom">From</label>
-            <input
-              id="historyFrom"
-              type="date"
-              [ngModel]="historyFrom()"
-              (ngModelChange)="historyFrom.set($event)"
-            />
-          </div>
+          @if (adminSection() === 'employees') {
+            <app-employee-admin></app-employee-admin>
+          }
 
-          <div>
-            <label for="historyTo">To</label>
-            <input
-              id="historyTo"
-              type="date"
-              [min]="historyFrom()"
-              [ngModel]="historyTo()"
-              (ngModelChange)="historyTo.set($event)"
-            />
-          </div>
+          @if (adminSection() === 'policies') {
+            <app-admin-settings
+              (changed)="loadDashboard()"
+            ></app-admin-settings>
+          }
 
-          <button
-            class="secondary"
-            type="button"
-            (click)="clearHistoryFilters()"
-          >
-            Clear
-          </button>
-        </div>
+          @if (adminSection() === 'holidays') {
+            <app-holiday-admin></app-holiday-admin>
+          }
+        }
 
         @if (
-          historyFrom() &&
-          historyTo() &&
-          historyFrom() > historyTo()
+          currentUser.role === 'MANAGER' &&
+          activeTab() === 'availability'
         ) {
-          <p class="error" role="alert">
-            From date cannot be after To date.
-          </p>
+          <app-team-availability></app-team-availability>
         }
 
-        <p role="status">
-          Showing {{ filteredRequests().length }}
-          of {{ requests().length }} requests
-        </p>
+        @if (
+          currentUser.role === 'MANAGER' &&
+          activeTab() === 'approvals'
+        ) {
+          <section class="card history">
+            <div class="welcome">
+              <div>
+                <h2>Team approvals</h2>
+                <p>Review leave requests from your direct reports.</p>
+              </div>
 
-        <div class="table-scroll">
-          <table>
-            <thead>
-              <tr>
-                <th scope="col">Type</th>
-                <th scope="col">Dates</th>
-                <th scope="col">Days</th>
-                <th scope="col">Status</th>
-                <th scope="col">Action</th>
-              </tr>
-            </thead>
+              <button
+                type="button"
+                (click)="refresh()"
+                [disabled]="isWorking()"
+              >
+                {{ busy() ? 'Loading…' : 'Refresh' }}
+              </button>
+            </div>
 
-            <tbody>
-              @for (request of filteredRequests(); track request.id) {
-                <tr>
-                  <td>{{ request.leaveType.name }}</td>
-                  <td>
-                    {{ request.startDate.slice(0, 10) }}
-                    →
-                    {{ request.endDate.slice(0, 10) }}
-                  </td>
-                  <td>{{ request.days }}</td>
+            <div class="request-filters">
+              <div>
+                <label for="approvalSearch">Search</label>
+                <input
+                  id="approvalSearch"
+                  type="search"
+                  placeholder="Employee, email, type, reason…"
+                  [ngModel]="approvalSearch()"
+                  (ngModelChange)="approvalSearch.set($event)"
+                />
+              </div>
 
-                  <td>
-                    <span
-                      class="status"
-                      [class.pending]="request.status === 'PENDING'"
-                      [class.approved]="request.status === 'APPROVED'"
-                      [class.rejected]="request.status === 'REJECTED'"
-                    >
-                      {{ request.status }}
-                    </span>
-                  </td>
+              <div>
+                <label for="approvalStatus">Status</label>
+                <select
+                  id="approvalStatus"
+                  [ngModel]="approvalStatus()"
+                  (ngModelChange)="approvalStatus.set($event)"
+                >
+                  <option value="ALL">All statuses</option>
+                  <option value="PENDING">Pending</option>
+                  <option value="APPROVED">Approved</option>
+                  <option value="REJECTED">Rejected</option>
+                  <option value="CANCELLED">Cancelled</option>
+                </select>
+              </div>
 
-                  <td>
-                    @if (
-                      request.status === 'PENDING' ||
-                      request.status === 'APPROVED'
-                    ) {
-                      <button
-                        class="secondary"
-                        type="button"
-                        (click)="cancelRequest(request.id)"
-                        [disabled]="isWorking()"
-                        [attr.aria-label]="'Cancel request ' + request.id"
-                      >
+              <div>
+                <label for="approvalFrom">From</label>
+                <input
+                  id="approvalFrom"
+                  type="date"
+                  [ngModel]="approvalFrom()"
+                  (ngModelChange)="approvalFrom.set($event)"
+                />
+              </div>
+
+              <div>
+                <label for="approvalTo">To</label>
+                <input
+                  id="approvalTo"
+                  type="date"
+                  [min]="approvalFrom()"
+                  [ngModel]="approvalTo()"
+                  (ngModelChange)="approvalTo.set($event)"
+                />
+              </div>
+
+              <button
+                class="secondary"
+                type="button"
+                (click)="clearApprovalFilters()"
+              >
+                Clear
+              </button>
+            </div>
+
+            @if (
+              approvalFrom() &&
+              approvalTo() &&
+              approvalFrom() > approvalTo()
+            ) {
+              <p class="error" role="alert">
+                From date cannot be after To date.
+              </p>
+            }
+
+            <p role="status">
+              Showing {{ filteredTeamRequests().length }}
+              of {{ teamRequests().length }} requests
+            </p>
+
+            <div class="table-scroll">
+              <table>
+                <thead>
+                  <tr>
+                    <th scope="col">Employee</th>
+                    <th scope="col">Type</th>
+                    <th scope="col">Dates</th>
+                    <th scope="col">Days</th>
+                    <th scope="col">Reason</th>
+                    <th scope="col">Status</th>
+                    <th scope="col">Actions</th>
+                    <th scope="col">History</th>
+                  </tr>
+                </thead>
+
+                <tbody>
+                  @for (
+                    request of filteredTeamRequests();
+                    track request.id
+                  ) {
+                    <tr>
+                      <td>{{ request.user.name }}</td>
+                      <td>{{ request.leaveType.name }}</td>
+                      <td>
+                        {{ request.startDate.slice(0, 10) }}
+                        → {{ request.endDate.slice(0, 10) }}
+                      </td>
+                      <td>{{ request.days }}</td>
+                      <td class="reason-cell">{{ request.reason }}</td>
+
+                      <td>
+                        <span
+                          class="status"
+                          [class.pending]="request.status === 'PENDING'"
+                          [class.approved]="request.status === 'APPROVED'"
+                          [class.rejected]="request.status === 'REJECTED'"
+                        >
+                          {{ request.status }}
+                        </span>
+                      </td>
+
+                      <td>
+                        @if (request.status === 'PENDING') {
+                          <div class="decision-actions">
+                            <button
+                              type="button"
+                              (click)="decideRequest(request.id, 'APPROVED')"
+                              [disabled]="isWorking()"
+                              [attr.aria-label]="
+                                'Approve request ' + request.id +
+                                ' from ' + request.user.name
+                              "
+                            >
+                              Approve
+                            </button>
+
+                            <button
+                              class="reject-button"
+                              type="button"
+                              (click)="decideRequest(request.id, 'REJECTED')"
+                              [disabled]="isWorking()"
+                              [attr.aria-label]="
+                                'Reject request ' + request.id +
+                                ' from ' + request.user.name
+                              "
+                            >
+                              Reject
+                            </button>
+                          </div>
+
+                          @if (decidingId() === request.id) {
+                            <span role="status">Saving decision…</span>
+                          }
+                        } @else {
+                          <span>—</span>
+                        }
+                      </td>
+
+                      <td>
+                        <button
+                          class="secondary"
+                          type="button"
+                          (click)="openAudit(request.id)"
+                          [disabled]="isWorking()"
+                          [attr.aria-label]="
+                            'View history for request ' + request.id +
+                            ' from ' + request.user.name
+                          "
+                        >
+                          View history
+                        </button>
+                      </td>
+                    </tr>
+                  } @empty {
+                    <tr>
+                      <td colspan="8">
                         {{
-                          cancellingId() === request.id
-                            ? 'Cancelling…'
-                            : 'Cancel'
+                          busy()
+                            ? 'Loading team requests…'
+                            : 'No requests match your filters.'
                         }}
-                      </button>
-                    } @else {
-                      <span>—</span>
-                    }
-                  </td>
-                </tr>
-              } @empty {
-                <tr>
-                  <td colspan="5">
-                    {{
-                      busy()
-                        ? 'Loading requests…'
-                        : 'No requests match your filters.'
-                    }}
-                  </td>
-                </tr>
+                      </td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          </section>
+        }
+
+        @if (
+          currentUser.role !== 'ADMIN' &&
+          activeTab() === 'calendar'
+        ) {
+          <section class="card team-calendar">
+            <div class="calendar-heading">
+              <div>
+                <h2>Team calendar</h2>
+                <p>Team leave on working days and public holidays.</p>
+              </div>
+
+              <form
+                class="calendar-controls"
+                #calendarForm="ngForm"
+                (ngSubmit)="loadCalendar()"
+              >
+                <label for="calendarMonth">Month</label>
+                <input
+                  id="calendarMonth"
+                  name="calendarMonth"
+                  type="month"
+                  [(ngModel)]="calendarMonth"
+                  min="1900-01"
+                  max="9999-12"
+                  required
+                  [disabled]="isWorking()"
+                />
+
+                <button
+                  type="submit"
+                  [disabled]="calendarForm.invalid || isWorking()"
+                >
+                  {{ calendarLoading() ? 'Loading…' : 'Show calendar' }}
+                </button>
+              </form>
+            </div>
+
+            @if (calendarError()) {
+              <p class="error" role="alert">{{ calendarError() }}</p>
+            }
+
+            @if (calendarLoading()) {
+              <p role="status">Loading calendar…</p>
+            }
+
+            @if (calendar(); as monthData) {
+              <div class="calendar-legend">
+                <span class="status pending">PENDING</span>
+                <span class="status approved">APPROVED</span>
+                <span class="holiday-label">PUBLIC HOLIDAY</span>
+              </div>
+
+              @if (monthData.requests.length === 0) {
+                <p>No active leave requests overlap this month.</p>
               }
-            </tbody>
-          </table>
+
+              <div
+                class="calendar-scroll"
+                tabindex="0"
+                role="region"
+                aria-label="Monthly team calendar"
+              >
+                <div class="calendar-grid">
+                  @for (
+                    weekday of ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+                    track weekday
+                  ) {
+                    <div class="weekday">{{ weekday }}</div>
+                  }
+
+                  @for (padding of calendarPadding(); track padding) {
+                    <div class="calendar-empty" aria-hidden="true"></div>
+                  }
+
+                  @for (day of calendarDays(); track day.date) {
+                    <div
+                      class="calendar-day"
+                      [class.weekend]="day.weekend"
+                    >
+                      <time [attr.datetime]="day.date">{{ day.day }}</time>
+
+                      @for (holiday of day.holidays; track $index) {
+                        <div class="holiday-label">{{ holiday }}</div>
+                      }
+
+                      @for (request of day.requests; track request.id) {
+                        <div
+                          class="calendar-entry"
+                          [class.pending]="request.status === 'PENDING'"
+                          [class.approved]="request.status === 'APPROVED'"
+                        >
+                          <strong>{{ request.user.name }}</strong>
+                          <small>{{ request.status }}</small>
+                        </div>
+                      }
+                    </div>
+                  }
+                </div>
+              </div>
+            }
+          </section>
+        }
+
+        @if (
+          currentUser.role !== 'ADMIN' &&
+          activeTab() === 'request'
+        ) {
+          <section class="card request-form">
+            <h2>Request leave</h2>
+            <p>Weekends and public holidays do not count as leave days.</p>
+
+            <form #leaveForm="ngForm" (ngSubmit)="submitLeave()">
+              <fieldset [disabled]="isWorking()">
+                <label for="leaveType">Leave type</label>
+                <select
+                  id="leaveType"
+                  name="leaveType"
+                  [(ngModel)]="leaveTypeId"
+                  required
+                >
+                  @for (type of leaveTypes(); track type.id) {
+                    <option [ngValue]="type.id">{{ type.name }}</option>
+                  }
+                </select>
+
+                <label for="startDate">Start date</label>
+                <input
+                  id="startDate"
+                  name="startDate"
+                  type="date"
+                  [(ngModel)]="startDate"
+                  required
+                />
+
+                <label for="endDate">End date</label>
+                <input
+                  id="endDate"
+                  name="endDate"
+                  type="date"
+                  [(ngModel)]="endDate"
+                  [min]="startDate"
+                  required
+                />
+
+                <label for="reason">Reason</label>
+                <textarea
+                  id="reason"
+                  name="reason"
+                  [(ngModel)]="reason"
+                  minlength="3"
+                  maxlength="1000"
+                  rows="3"
+                  required
+                ></textarea>
+
+                <button
+                  type="submit"
+                  [disabled]="
+                    leaveForm.invalid ||
+                    !leaveTypes().length ||
+                    isWorking()
+                  "
+                >
+                  {{ submitting() ? 'Submitting…' : 'Submit request' }}
+                </button>
+              </fieldset>
+            </form>
+          </section>
+        }
+
+        @if (
+          currentUser.role !== 'ADMIN' &&
+          activeTab() === 'history'
+        ) {
+          <section class="card history">
+            <div class="welcome">
+              <div>
+                <h2>My requests</h2>
+                <p>All years · Pending and approved leave can be cancelled.</p>
+              </div>
+
+              <button
+                type="button"
+                (click)="refresh()"
+                [disabled]="isWorking()"
+              >
+                {{ busy() ? 'Loading…' : 'Refresh' }}
+              </button>
+            </div>
+
+            <div class="request-filters">
+              <div>
+                <label for="historySearch">Search</label>
+                <input
+                  id="historySearch"
+                  type="search"
+                  placeholder="Leave type, reason, request ID…"
+                  [ngModel]="historySearch()"
+                  (ngModelChange)="historySearch.set($event)"
+                />
+              </div>
+
+              <div>
+                <label for="historyStatus">Status</label>
+                <select
+                  id="historyStatus"
+                  [ngModel]="historyStatus()"
+                  (ngModelChange)="historyStatus.set($event)"
+                >
+                  <option value="ALL">All statuses</option>
+                  <option value="PENDING">Pending</option>
+                  <option value="APPROVED">Approved</option>
+                  <option value="REJECTED">Rejected</option>
+                  <option value="CANCELLED">Cancelled</option>
+                </select>
+              </div>
+
+              <div>
+                <label for="historyFrom">From</label>
+                <input
+                  id="historyFrom"
+                  type="date"
+                  [ngModel]="historyFrom()"
+                  (ngModelChange)="historyFrom.set($event)"
+                />
+              </div>
+
+              <div>
+                <label for="historyTo">To</label>
+                <input
+                  id="historyTo"
+                  type="date"
+                  [min]="historyFrom()"
+                  [ngModel]="historyTo()"
+                  (ngModelChange)="historyTo.set($event)"
+                />
+              </div>
+
+              <button
+                class="secondary"
+                type="button"
+                (click)="clearHistoryFilters()"
+              >
+                Clear
+              </button>
+            </div>
+
+            @if (
+              historyFrom() &&
+              historyTo() &&
+              historyFrom() > historyTo()
+            ) {
+              <p class="error" role="alert">
+                From date cannot be after To date.
+              </p>
+            }
+
+            <p role="status">
+              Showing {{ filteredRequests().length }}
+              of {{ requests().length }} requests
+            </p>
+
+            <div class="table-scroll">
+              <table>
+                <thead>
+                  <tr>
+                    <th scope="col">Type</th>
+                    <th scope="col">Dates</th>
+                    <th scope="col">Days</th>
+                    <th scope="col">Status</th>
+                    <th scope="col">Action</th>
+                    <th scope="col">History</th>
+                  </tr>
+                </thead>
+
+                <tbody>
+                  @for (request of filteredRequests(); track request.id) {
+                    <tr>
+                      <td>{{ request.leaveType.name }}</td>
+                      <td>
+                        {{ request.startDate.slice(0, 10) }}
+                        → {{ request.endDate.slice(0, 10) }}
+                      </td>
+                      <td>{{ request.days }}</td>
+
+                      <td>
+                        <span
+                          class="status"
+                          [class.pending]="request.status === 'PENDING'"
+                          [class.approved]="request.status === 'APPROVED'"
+                          [class.rejected]="request.status === 'REJECTED'"
+                        >
+                          {{ request.status }}
+                        </span>
+                      </td>
+
+                      <td>
+                        @if (
+                          request.status === 'PENDING' ||
+                          request.status === 'APPROVED'
+                        ) {
+                          <button
+                            class="secondary"
+                            type="button"
+                            (click)="cancelRequest(request.id)"
+                            [disabled]="isWorking()"
+                            [attr.aria-label]="'Cancel request ' + request.id"
+                          >
+                            {{
+                              cancellingId() === request.id
+                                ? 'Cancelling…'
+                                : 'Cancel'
+                            }}
+                          </button>
+                        } @else {
+                          <span>—</span>
+                        }
+                      </td>
+
+                      <td>
+                        <button
+                          class="secondary"
+                          type="button"
+                          (click)="openAudit(request.id)"
+                          [disabled]="isWorking()"
+                          [attr.aria-label]="
+                            'View history for request ' + request.id
+                          "
+                        >
+                          View history
+                        </button>
+                      </td>
+                    </tr>
+                  } @empty {
+                    <tr>
+                      <td colspan="6">
+                        {{
+                          busy()
+                            ? 'Loading requests…'
+                            : 'No requests match your filters.'
+                        }}
+                      </td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          </section>
+        }
+      } @else {
+        <div class="auth-layout">
+          <aside class="auth-story">
+            <a class="workspace-brand" href="/">
+              <span class="brand-icon">c<span>:</span></span>
+              <span>
+                cardinality
+                <small>PEOPLE WORKSPACE</small>
+              </span>
+            </a>
+
+            <div class="story-copy">
+              <span class="eyebrow">
+                A LITTLE SPACE. A BETTER WORKDAY.
+              </span>
+
+              <h1>
+                Good work.<br />
+                Great balance<span>.</span>
+              </h1>
+
+              <p>
+                Plan your time away. Keep your team connected.
+                Come back recharged.
+              </p>
+
+              <div class="story-illustration" aria-hidden="true">
+                <div class="orb"></div>
+
+                <div class="illustration-card">
+                  <span>YOUR NEXT CHAPTER</span>
+                  <strong>Room to recharge.</strong>
+
+                  <div class="mini-week">
+                    <i>M</i><i>T</i><i>W</i><i>T</i><i>F</i>
+                  </div>
+                  <div class="mini-days">
+                    <i>12</i><i>13</i><i>14</i><i>15</i><i>16</i>
+                  </div>
+                </div>
+
+                <span class="floating-note">✦ Make time for you.</span>
+              </div>
+            </div>
+
+            <p class="story-footer">
+              Thoughtful time off. Stronger teams.
+            </p>
+          </aside>
+
+          <div class="auth-content">
+            <div class="auth-inner">
+              @if (showForgotPassword()) {
+                <app-forgot-password
+                  (completed)="passwordResetCompleted($event)"
+                  (cancelled)="showForgotPassword.set(false)"
+                ></app-forgot-password>
+              } @else if (showSignup()) {
+                <app-signup
+                  (completed)="signupCompleted($event)"
+                  (cancelled)="showSignup.set(false)"
+                ></app-signup>
+              } @else {
+                <section class="login card">
+                  <span class="eyebrow">WELCOME BACK</span>
+                  <h2>Sign in to your workspace</h2>
+                  <p>A clearer workday starts here.</p>
+
+                  <form #loginForm="ngForm" (ngSubmit)="login()">
+                    <label for="email">Email</label>
+                    <input
+                      id="email"
+                      name="email"
+                      type="email"
+                      [(ngModel)]="email"
+                      autocomplete="username"
+                      required
+                      email
+                      [disabled]="busy()"
+                    />
+
+                    <label for="password">Password</label>
+                    <input
+                      id="password"
+                      name="password"
+                      [type]="showPassword() ? 'text' : 'password'"
+                      [(ngModel)]="password"
+                      autocomplete="current-password"
+                      required
+                      [disabled]="busy()"
+                    />
+
+                    <button
+                      class="password-toggle text-button"
+                      type="button"
+                      (click)="showPassword.set(!showPassword())"
+                      [attr.aria-pressed]="showPassword()"
+                    >
+                      {{ showPassword() ? 'Hide password' : 'Show password' }}
+                    </button>
+
+                    <button
+                      type="submit"
+                      [disabled]="loginForm.invalid || busy()"
+                    >
+                      {{ busy() ? 'Signing in…' : 'Sign in' }}
+                    </button>
+                  </form>
+
+                  <button
+                    class="text-button"
+                    type="button"
+                    style="margin-top: 16px"
+                    (click)="
+                      showForgotPassword.set(true);
+                      showSignup.set(false);
+                      error.set('');
+                      success.set('')
+                    "
+                    [disabled]="busy()"
+                  >
+                    Forgot password?
+                  </button>
+
+                  <p>Don't have an account?</p>
+
+                  <button
+                    class="secondary"
+                    type="button"
+                    (click)="
+                      showSignup.set(true);
+                      showForgotPassword.set(false);
+                      error.set('');
+                      success.set('')
+                    "
+                    [disabled]="busy()"
+                  >
+                    Create account
+                  </button>
+                </section>
+              }
+            </div>
+
+            <p class="auth-footer">
+              Cardinality · Your people workspace
+            </p>
+          </div>
         </div>
-      </section>
-    }
-  } @else {
-    @if (showForgotPassword()) {
-      <app-forgot-password
-        (completed)="passwordResetCompleted($event)"
-        (cancelled)="showForgotPassword.set(false)"
-      ></app-forgot-password>
-    } @else if (showSignup()) {
-      <app-signup
-        (completed)="signupCompleted($event)"
-        (cancelled)="showSignup.set(false)"
-      ></app-signup>
-    } @else {
-      <section class="login card">
-        <h2>Sign in</h2>
-        <p>Manage your time away, all in one place.</p>
+      }
+    </div>
+  </main>
+}
 
-        <form #loginForm="ngForm" (ngSubmit)="login()">
-          <label for="email">Email</label>
-          <input
-            id="email"
-            name="email"
-            type="email"
-            [(ngModel)]="email"
-            autocomplete="username"
-            required
-            email
-            [disabled]="busy()"
-          />
-
-          <label for="password">Password</label>
-          <input
-            id="password"
-            name="password"
-            type="password"
-            [(ngModel)]="password"
-            autocomplete="current-password"
-            required
-            [disabled]="busy()"
-          />
-
-          <button
-            type="submit"
-            [disabled]="loginForm.invalid || busy()"
-          >
-            {{ busy() ? 'Signing in…' : 'Sign in' }}
-          </button>
-        </form>
-
-        <button
-          class="secondary"
-          type="button"
-          style="margin-top: 16px"
-          (click)="
-            showForgotPassword.set(true);
-            showSignup.set(false);
-            error.set('');
-            success.set('')
-          "
-          [disabled]="busy()"
-        >
-          Forgot password?
-        </button>
-
-        <p>Don't have an account?</p>
-
-        <button
-          class="secondary"
-          type="button"
-          (click)="
-            showSignup.set(true);
-            showForgotPassword.set(false);
-            error.set('');
-            success.set('')
-          "
-          [disabled]="busy()"
-        >
-          Create account
-        </button>
-      </section>
-    }
-  }
-</main>
+<router-outlet></router-outlet>

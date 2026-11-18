@@ -17,7 +17,11 @@ import { ApiService } from './api.service';
   imports: [FormsModule],
   template: `
     <section class="reset-card">
-      <h2>{{ codeSent() ? 'Reset password' : 'Forgot password?' }}</h2>
+      <span class="eyebrow">LET’S GET YOU BACK IN</span>
+
+      <h2>
+        {{ codeSent() ? 'Reset password' : 'Forgot password?' }}
+      </h2>
 
       @if (error()) {
         <p class="error" role="alert">{{ error() }}</p>
@@ -46,7 +50,11 @@ import { ApiService } from './api.service';
 
             <button
               type="submit"
-              [disabled]="emailForm.invalid || busy() || cooldown() > 0"
+              [disabled]="
+                emailForm.invalid ||
+                busy() ||
+                cooldown() > 0
+              "
             >
               {{ busy() ? 'Sending…' : 'Send reset code' }}
             </button>
@@ -54,7 +62,9 @@ import { ApiService } from './api.service';
         </form>
 
         @if (cooldown() > 0) {
-          <p>Please wait {{ cooldown() }} seconds before requesting again.</p>
+          <p>
+            Please wait {{ cooldown() }} seconds before requesting again.
+          </p>
         }
       } @else {
         <p>
@@ -81,7 +91,7 @@ import { ApiService } from './api.service';
             <input
               id="newPassword"
               name="newPassword"
-              type="password"
+              [type]="showPassword() ? 'text' : 'password'"
               [(ngModel)]="password"
               autocomplete="new-password"
               minlength="8"
@@ -89,11 +99,29 @@ import { ApiService } from './api.service';
               required
             />
 
-            <label for="confirmNewPassword">Confirm new password</label>
+            <div class="password-guidance">
+              <span [class.met]="password.length >= 8">
+                {{ password.length >= 8 ? '✓' : '○' }}
+                At least 8 characters
+              </span>
+
+              <button
+                class="link"
+                type="button"
+                (click)="showPassword.set(!showPassword())"
+                [attr.aria-pressed]="showPassword()"
+              >
+                {{ showPassword() ? 'Hide passwords' : 'Show passwords' }}
+              </button>
+            </div>
+
+            <label for="confirmNewPassword">
+              Confirm new password
+            </label>
             <input
               id="confirmNewPassword"
               name="confirmNewPassword"
-              type="password"
+              [type]="showPassword() ? 'text' : 'password'"
               [(ngModel)]="confirmPassword"
               autocomplete="new-password"
               minlength="8"
@@ -101,9 +129,19 @@ import { ApiService } from './api.service';
               required
             />
 
+            @if (confirmPassword && password !== confirmPassword) {
+              <p class="field-hint" role="status">
+                Passwords must match.
+              </p>
+            }
+
             <button
               type="submit"
-              [disabled]="resetForm.invalid || busy()"
+              [disabled]="
+                resetForm.invalid ||
+                busy() ||
+                password !== confirmPassword
+              "
             >
               {{ busy() ? 'Resetting…' : 'Reset password' }}
             </button>
@@ -143,109 +181,7 @@ import { ApiService } from './api.service';
       </button>
     </section>
   `,
-  styles: `
-    :host {
-      display: block;
-    }
-
-    * {
-      box-sizing: border-box;
-    }
-
-    .reset-card {
-      max-width: 460px;
-      margin: 40px auto;
-      padding: 28px;
-      background: white;
-      border: 1px solid #e1e7ef;
-      border-radius: 18px;
-    }
-
-    h2 {
-      margin-top: 0;
-    }
-
-    p {
-      color: #627088;
-      line-height: 1.6;
-      overflow-wrap: anywhere;
-    }
-
-    fieldset {
-      display: grid;
-      gap: 12px;
-      min-width: 0;
-      margin: 20px 0;
-      padding: 0;
-      border: 0;
-    }
-
-    label {
-      font-size: 14px;
-      font-weight: 600;
-    }
-
-    input {
-      width: 100%;
-      min-width: 0;
-      padding: 12px;
-      border: 1px solid #cbd4e1;
-      border-radius: 8px;
-      font: inherit;
-    }
-
-    button {
-      padding: 12px 16px;
-      border: 0;
-      border-radius: 8px;
-      background: #4263eb;
-      color: white;
-      font: inherit;
-      font-weight: 600;
-      cursor: pointer;
-    }
-
-    button:disabled {
-      opacity: 0.6;
-      cursor: default;
-    }
-
-    input:focus-visible,
-    button:focus-visible {
-      outline: 3px solid #a7b8ff;
-      outline-offset: 3px;
-    }
-
-    .secondary {
-      width: 100%;
-      background: #edf1fa;
-      color: #334155;
-    }
-
-    .link {
-      display: block;
-      margin-top: 12px;
-      padding-left: 0;
-      background: transparent;
-      color: #4263eb;
-    }
-
-    .error,
-    .success {
-      padding: 12px;
-      border-radius: 8px;
-    }
-
-    .error {
-      background: #fff0f0;
-      color: #a32222;
-    }
-
-    .success {
-      background: #eaf8ef;
-      color: #21643b;
-    }
-  `,
+  styleUrl: './auth-forms.scss',
 })
 export class ForgotPassword implements OnDestroy {
   private readonly api = inject(ApiService);
@@ -257,16 +193,17 @@ export class ForgotPassword implements OnDestroy {
   readonly completed = output<string>();
   readonly cancelled = output<void>();
 
-  email = '';
-  otp = '';
-  password = '';
-  confirmPassword = '';
-
+  readonly showPassword = signal(false);
   readonly codeSent = signal(false);
   readonly busy = signal(false);
   readonly error = signal('');
   readonly message = signal('');
   readonly cooldown = signal(0);
+
+  email = '';
+  otp = '';
+  password = '';
+  confirmPassword = '';
 
   sendCode() {
     if (this.busy() || this.cooldown() > 0) return;
@@ -283,15 +220,18 @@ export class ForgotPassword implements OnDestroy {
 
     this.busy.set(true);
 
-    this.api.forgotPassword(email)
+    this.api
+      .forgotPassword(email)
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (response) => {
           this.email = email;
           this.otp = '';
+
           this.codeSent.set(true);
           this.busy.set(false);
           this.message.set(response.message);
+
           this.startCooldown(response.resendAfterSeconds);
         },
         error: (error: HttpErrorResponse) => {
@@ -329,18 +269,20 @@ export class ForgotPassword implements OnDestroy {
 
     this.busy.set(true);
 
-    this.api.resetPassword({
-      email: this.email,
-      otp: this.otp.trim(),
-      password: this.password,
-      confirmPassword: this.confirmPassword,
-    })
+    this.api
+      .resetPassword({
+        email: this.email,
+        otp: this.otp.trim(),
+        password: this.password,
+        confirmPassword: this.confirmPassword,
+      })
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: () => {
           this.password = '';
           this.confirmPassword = '';
           this.otp = '';
+
           this.busy.set(false);
           this.completed.emit(this.email);
         },
@@ -353,15 +295,19 @@ export class ForgotPassword implements OnDestroy {
 
   editEmail() {
     this.codeSent.set(false);
+
     this.otp = '';
     this.password = '';
     this.confirmPassword = '';
+
     this.error.set('');
     this.message.set('');
   }
 
   private startCooldown(seconds: number) {
-    if (this.timer) clearInterval(this.timer);
+    if (this.timer) {
+      clearInterval(this.timer);
+    }
 
     this.resendAt = Date.now() + seconds * 1000;
     this.cooldown.set(seconds);
@@ -396,7 +342,10 @@ export class ForgotPassword implements OnDestroy {
   }
 
   ngOnDestroy() {
-    if (this.timer) clearInterval(this.timer);
+    if (this.timer) {
+      clearInterval(this.timer);
+    }
+
     this.password = '';
     this.confirmPassword = '';
     this.otp = '';

@@ -35,6 +35,9 @@ describe('LeaveService', () => {
     leaveBalance: {
       findUnique: asyncMock(),
     },
+    leaveAudit: {
+      create: asyncMock(),
+    },
     leaveRequest: {
       findFirst: asyncMock(),
       findMany: asyncMock(),
@@ -45,14 +48,15 @@ describe('LeaveService', () => {
     },
   };
 
-  // Separate lookup used after the transaction for notifications.
   const notificationLookup = asyncMock();
+  const historyLookup = asyncMock();
 
   const prisma = {
     ...tx,
     leaveRequest: {
       ...tx.leaveRequest,
       findUnique: notificationLookup,
+      findFirst: historyLookup,
     },
     $transaction: jest.fn(
       async (callback: (client: typeof tx) => Promise<unknown>) =>
@@ -98,6 +102,7 @@ describe('LeaveService', () => {
     tx.leaveRequest.findUnique.mockResolvedValue({
       id: 10,
       userId: 1,
+      status: 'PENDING',
       user: { managerId: 3 },
     });
 
@@ -157,6 +162,7 @@ describe('LeaveService', () => {
 
     tx.publicHoliday.findMany.mockResolvedValue([]);
     tx.leaveBalance.findUnique.mockResolvedValue(null);
+    tx.leaveAudit.create.mockResolvedValue({ id: 1 });
 
     tx.leaveRequest.findFirst.mockResolvedValue(null);
     tx.leaveRequest.findMany.mockResolvedValue([]);
@@ -168,10 +174,12 @@ describe('LeaveService', () => {
     });
 
     notificationLookup.mockResolvedValue(null);
+    historyLookup.mockResolvedValue(null);
 
     mail.sendLeaveRequestNotification.mockResolvedValue(
       undefined,
     );
+
     mail.sendLeaveDecisionNotification.mockResolvedValue(
       undefined,
     );
@@ -187,7 +195,7 @@ describe('LeaveService', () => {
     jest.useRealTimers();
   });
 
-  it('creates a pending request for two working days', async () => {
+  it('creates a pending request and its audit entry', async () => {
     const result = await service.create(1, dto);
 
     expect(result.status).toBe('PENDING');
@@ -198,6 +206,16 @@ describe('LeaveService', () => {
         leaveTypeId: 1,
         days: 2,
       }),
+    });
+
+    expect(tx.leaveAudit.create).toHaveBeenCalledWith({
+      data: {
+        requestId: 10,
+        actorId: 1,
+        action: 'REQUESTED',
+        fromStatus: null,
+        toStatus: 'PENDING',
+      },
     });
   });
 
@@ -229,9 +247,7 @@ describe('LeaveService', () => {
     });
 
     expect(tx.leaveRequest.create).toHaveBeenCalledWith({
-      data: expect.objectContaining({
-        days: 2,
-      }),
+      data: expect.objectContaining({ days: 2 }),
     });
   });
 
@@ -245,9 +261,7 @@ describe('LeaveService', () => {
     await service.create(1, dto);
 
     expect(tx.leaveRequest.create).toHaveBeenCalledWith({
-      data: expect.objectContaining({
-        days: 1,
-      }),
+      data: expect.objectContaining({ days: 1 }),
     });
   });
 
@@ -340,12 +354,10 @@ describe('LeaveService', () => {
 
     await expect(
       service.create(1, dto),
-    ).rejects.toThrow(
-      'Team coverage limit reached',
-    );
+    ).rejects.toThrow('Team coverage limit reached');
   });
 
-  it('blocks a manager from deciding another manager’s report', async () => {
+  it('blocks decisions on another manager’s report', async () => {
     tx.user.findUnique.mockResolvedValue({
       id: 3,
       role: 'MANAGER',
@@ -363,13 +375,15 @@ describe('LeaveService', () => {
       'You can only decide requests from your own reports',
     );
 
+    expect(tx.leaveAudit.create).not.toHaveBeenCalled();
+
     expect(
       mail.sendLeaveDecisionNotification,
     ).not.toHaveBeenCalled();
   });
 
   it('blocks cancellation of another employee’s request', async () => {
-    notificationLookup.mockResolvedValue({
+    tx.leaveRequest.findUnique.mockResolvedValue({
       id: 10,
       userId: 2,
       status: 'PENDING',
@@ -380,10 +394,12 @@ describe('LeaveService', () => {
     ).rejects.toThrow(
       'You can only cancel your own leave',
     );
+
+    expect(tx.leaveAudit.create).not.toHaveBeenCalled();
   });
 
-  it('cancels an approved request', async () => {
-    notificationLookup.mockResolvedValue({
+  it('cancels approved leave and records its previous status', async () => {
+    tx.leaveRequest.findUnique.mockResolvedValue({
       id: 10,
       userId: 1,
       status: 'APPROVED',
@@ -407,12 +423,20 @@ describe('LeaveService', () => {
       where: {
         id: 10,
         userId: 1,
-        status: {
-          in: ['PENDING', 'APPROVED'],
-        },
+        status: 'APPROVED',
       },
       data: {
         status: 'CANCELLED',
+      },
+    });
+
+    expect(tx.leaveAudit.create).toHaveBeenCalledWith({
+      data: {
+        requestId: 10,
+        actorId: 1,
+        action: 'CANCELLED',
+        fromStatus: 'APPROVED',
+        toStatus: 'CANCELLED',
       },
     });
   });
@@ -446,7 +470,7 @@ describe('LeaveService', () => {
     });
   });
 
-  it('returns the saved request even when manager email fails', async () => {
+  it('returns the saved request when manager email fails', async () => {
     notificationLookup.mockResolvedValue(
       notificationRecord(),
     );
@@ -463,12 +487,13 @@ describe('LeaveService', () => {
     });
 
     expect(transactionCommitted).toBe(true);
+
     expect(
       mail.sendLeaveRequestNotification,
     ).toHaveBeenCalledTimes(1);
   });
 
-  it('does not send a notification when creation fails', async () => {
+  it('does not send email when request creation fails', async () => {
     tx.leaveRequest.create.mockRejectedValue(
       new Error('Database write failed'),
     );
@@ -478,7 +503,7 @@ describe('LeaveService', () => {
     ).rejects.toThrow('Database write failed');
 
     expect(transactionCommitted).toBe(false);
-    expect(notificationLookup).not.toHaveBeenCalled();
+    expect(tx.leaveAudit.create).not.toHaveBeenCalled();
 
     expect(
       mail.sendLeaveRequestNotification,
@@ -486,7 +511,7 @@ describe('LeaveService', () => {
   });
 
   it.each(['APPROVED', 'REJECTED'] as const)(
-    'notifies the employee after a request is %s',
+    'records and emails a %s decision',
     async (status) => {
       prepareDecision();
 
@@ -509,6 +534,16 @@ describe('LeaveService', () => {
       expect(result.status).toBe(status);
       expect(committedWhenEmailSent).toBe(true);
 
+      expect(tx.leaveAudit.create).toHaveBeenCalledWith({
+        data: {
+          requestId: 10,
+          actorId: 3,
+          action: status,
+          fromStatus: 'PENDING',
+          toStatus: status,
+        },
+      });
+
       expect(
         mail.sendLeaveDecisionNotification,
       ).toHaveBeenCalledWith({
@@ -521,7 +556,7 @@ describe('LeaveService', () => {
     },
   );
 
-  it('returns the saved decision even when employee email fails', async () => {
+  it('returns the saved decision when employee email fails', async () => {
     prepareDecision();
 
     mail.sendLeaveDecisionNotification.mockRejectedValue(
@@ -537,9 +572,153 @@ describe('LeaveService', () => {
     });
 
     expect(transactionCommitted).toBe(true);
+  });
+
+  it('does not finish creation or send email when audit writing fails', async () => {
+    tx.leaveAudit.create.mockRejectedValue(
+      new Error('Audit write failed'),
+    );
+
+    await expect(
+      service.create(1, dto),
+    ).rejects.toThrow('Audit write failed');
+
+    expect(transactionCommitted).toBe(false);
+
+    expect(
+      mail.sendLeaveRequestNotification,
+    ).not.toHaveBeenCalled();
+  });
+
+  it('does not finish a decision when audit writing fails', async () => {
+    prepareDecision();
+
+    tx.leaveAudit.create.mockRejectedValue(
+      new Error('Audit write failed'),
+    );
+
+    await expect(
+      service.decide(3, 10, 'APPROVED'),
+    ).rejects.toThrow('Audit write failed');
+
+    expect(transactionCommitted).toBe(false);
 
     expect(
       mail.sendLeaveDecisionNotification,
-    ).toHaveBeenCalledTimes(1);
+    ).not.toHaveBeenCalled();
+  });
+
+  it('does not record cancellation when the request changed concurrently', async () => {
+    tx.leaveRequest.findUnique.mockResolvedValue({
+      id: 10,
+      userId: 1,
+      status: 'PENDING',
+    });
+
+    tx.leaveRequest.updateMany.mockResolvedValue({
+      count: 0,
+    });
+
+    await expect(
+      service.cancel(1, 10),
+    ).rejects.toThrow(
+      'Request changed. Refresh and try again.',
+    );
+
+    expect(tx.leaveAudit.create).not.toHaveBeenCalled();
+  });
+
+  it('restricts an employee audit query to their own request', async () => {
+    tx.user.findUnique.mockResolvedValue({
+      id: 1,
+      role: 'EMPLOYEE',
+    });
+
+    const events = [
+      {
+        id: 1,
+        action: 'REQUESTED',
+        actor: { id: 1, name: 'Employee' },
+      },
+    ];
+
+    historyLookup.mockResolvedValue({
+      id: 10,
+      auditEvents: events,
+    });
+
+    await expect(
+      service.getAudit(1, 10),
+    ).resolves.toEqual(events);
+
+    expect(historyLookup).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          id: 10,
+          userId: 1,
+        },
+      }),
+    );
+  });
+
+  it('scopes manager audit queries to self or direct reports', async () => {
+    tx.user.findUnique.mockResolvedValue({
+      id: 3,
+      role: 'MANAGER',
+    });
+
+    historyLookup.mockResolvedValue({
+      id: 10,
+      auditEvents: [],
+    });
+
+    await service.getAudit(3, 10);
+
+    expect(historyLookup).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          id: 10,
+          OR: [
+            { userId: 3 },
+            { user: { managerId: 3 } },
+          ],
+        },
+      }),
+    );
+  });
+
+  it('allows an admin audit query without an ownership restriction', async () => {
+    tx.user.findUnique.mockResolvedValue({
+      id: 2,
+      role: 'ADMIN',
+    });
+
+    historyLookup.mockResolvedValue({
+      id: 10,
+      auditEvents: [],
+    });
+
+    await service.getAudit(2, 10);
+
+    expect(historyLookup).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 10 },
+      }),
+    );
+  });
+
+  it('returns an error when no accessible audit request is found', async () => {
+    tx.user.findUnique.mockResolvedValue({
+      id: 1,
+      role: 'EMPLOYEE',
+    });
+
+    historyLookup.mockResolvedValue(null);
+
+    await expect(
+      service.getAudit(1, 999),
+    ).rejects.toThrow(
+      'Request not found or access denied',
+    );
   });
 });

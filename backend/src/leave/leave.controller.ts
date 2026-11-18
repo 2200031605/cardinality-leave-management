@@ -21,7 +21,9 @@ import { LeaveService } from './leave.service';
 @Controller('leave')
 @UseGuards(JwtAuthGuard)
 export class LeaveController {
-  constructor(private readonly leaveService: LeaveService) {}
+  constructor(
+    private readonly leaveService: LeaveService,
+  ) {}
 
   @Get('types')
   getLeaveTypes() {
@@ -30,7 +32,9 @@ export class LeaveController {
 
   @Get('my-requests')
   getMyRequests(@Req() request: AuthRequest) {
-    return this.leaveService.getMyRequests(request.user!.sub);
+    return this.leaveService.getMyRequests(
+      request.user!.sub,
+    );
   }
 
   @Post('requests')
@@ -38,14 +42,19 @@ export class LeaveController {
     @Req() request: AuthRequest,
     @Body() dto: CreateLeaveDto,
   ) {
-    return this.leaveService.create(request.user!.sub, dto);
+    return this.leaveService.create(
+      request.user!.sub,
+      dto,
+    );
   }
 
   @Get('team-requests')
   @UseGuards(RolesGuard)
   @Roles('MANAGER')
   getTeamRequests(@Req() request: AuthRequest) {
-    return this.leaveService.getTeamRequests(request.user!.sub);
+    return this.leaveService.getTeamRequests(
+      request.user!.sub,
+    );
   }
 
   @Patch('requests/:id/decision')
@@ -56,7 +65,11 @@ export class LeaveController {
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: DecideLeaveDto,
   ) {
-    return this.leaveService.decide(request.user!.sub, id, dto.status);
+    return this.leaveService.decide(
+      request.user!.sub,
+      id,
+      dto.status,
+    );
   }
 
   @Patch('requests/:id/cancel')
@@ -64,27 +77,57 @@ export class LeaveController {
     @Req() request: AuthRequest,
     @Param('id', ParseIntPipe) id: number,
   ) {
-    return this.leaveService.cancel(request.user!.sub, id);
+    return this.leaveService.cancel(
+      request.user!.sub,
+      id,
+    );
   }
 
   @Get('balances')
-getMyBalances(
-  @Req() request: AuthRequest,
-  @Query('year', ParseIntPipe) year: number,
-) {
-  return this.leaveService.getMyBalances(request.user!.sub, year);
-}
+  getMyBalances(
+    @Req() request: AuthRequest,
+    @Query('year', ParseIntPipe) year: number,
+  ) {
+    return this.leaveService.getMyBalances(
+      request.user!.sub,
+      year,
+    );
+  }
 
-@Get('calendar')
-getTeamCalendar(
-  @Req() request: AuthRequest,
-  @Query('year', ParseIntPipe) year: number,
-  @Query('month', ParseIntPipe) month: number,
-) {
-  return this.leaveService.getTeamCalendar(
-    request.user!.sub,
-    year,
-    month,
-  );
-}
+  @Get('calendar')
+  getTeamCalendar(
+    @Req() request: AuthRequest,
+    @Query('year', ParseIntPipe) year: number,
+    @Query('month', ParseIntPipe) month: number,
+  ) {
+    return this.leaveService.getTeamCalendar(
+      request.user!.sub,
+      year,
+      month,
+    );
+  }
+
+  @Get('availability')
+  getTeamAvailability(
+    @Req() request: AuthRequest,
+    @Query('startDate') startDate: string,
+    @Query('endDate') endDate: string,
+  ) {
+    return this.leaveService.getTeamAvailability(
+      request.user!.sub,
+      startDate,
+      endDate,
+    );
+  }
+
+  @Get('requests/:id/audit')
+  getAudit(
+    @Req() request: AuthRequest,
+    @Param('id', ParseIntPipe) id: number,
+  ) {
+    return this.leaveService.getAudit(
+      request.user!.sub,
+      id,
+    );
+  }
 }

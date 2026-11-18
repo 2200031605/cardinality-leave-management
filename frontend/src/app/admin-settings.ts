@@ -1,3 +1,5 @@
+
+
 import {
   Component,
   OnInit,
@@ -17,7 +19,7 @@ import type { LeaveType } from './api.service';
   imports: [FormsModule],
   template: `
     <section class="panel">
-      <h2>Administration</h2>
+      <h2>Leave policies</h2>
       <p>Manage leave rules, types, and yearly allowances.</p>
 
       @if (error()) {
@@ -140,116 +142,7 @@ import type { LeaveType } from './api.service';
       }
     </section>
   `,
-  styles: `
-    :host {
-      display: block;
-      margin-top: 28px;
-    }
-
-    * {
-      box-sizing: border-box;
-    }
-
-    .panel {
-      padding: 28px;
-      border: 1px solid #e1e7ef;
-      border-radius: 18px;
-      background: white;
-    }
-
-    h2 {
-      margin-top: 0;
-    }
-
-    p {
-      color: #627088;
-      line-height: 1.6;
-    }
-
-    fieldset {
-      display: grid;
-      gap: 12px;
-      max-width: 560px;
-      min-width: 0;
-      margin: 0;
-      padding: 0;
-      border: 0;
-    }
-
-    label {
-      font-size: 14px;
-      font-weight: 600;
-    }
-
-    input {
-      min-width: 0;
-      padding: 12px;
-      border: 1px solid #cbd4e1;
-      border-radius: 8px;
-      font: inherit;
-    }
-
-    button {
-      padding: 12px 18px;
-      border: 0;
-      border-radius: 8px;
-      background: #4263eb;
-      color: white;
-      cursor: pointer;
-      font: inherit;
-      font-weight: 600;
-    }
-
-    button:disabled {
-      opacity: 0.6;
-      cursor: default;
-    }
-
-    input:focus-visible,
-    button:focus-visible {
-      outline: 3px solid #a7b8ff;
-      outline-offset: 3px;
-    }
-
-    .section-heading {
-      margin-top: 32px;
-    }
-
-    .allowance-form {
-      display: grid;
-      grid-template-columns: minmax(80px, 1fr) minmax(80px, 140px) auto;
-      align-items: center;
-      gap: 12px;
-      max-width: 560px;
-      margin-top: 12px;
-    }
-
-    .error,
-    .success {
-      padding: 14px;
-      border-radius: 8px;
-    }
-
-    .error {
-      background: #fff0f0;
-      color: #a32222;
-    }
-
-    .success {
-      background: #eaf8ef;
-      color: #21643b;
-    }
-
-    @media (max-width: 600px) {
-      .panel {
-        padding: 20px;
-      }
-
-      .allowance-form {
-        grid-template-columns: 1fr;
-      }
-    }
-  `,
+  styleUrl: './workspace-panels.scss',
 })
 export class AdminSettings implements OnInit {
   private readonly api = inject(ApiService);
@@ -320,22 +213,24 @@ export class AdminSettings implements OnInit {
 
     this.saving.set(true);
 
-    this.api.updateSettings({
-      minimumNoticeDays: this.minimumNoticeDays,
-      maxTeamMembersOff: this.maxTeamMembersOff,
-    }).subscribe({
-      next: (settings) => {
-        this.minimumNoticeDays = settings.minimumNoticeDays;
-        this.maxTeamMembersOff = settings.maxTeamMembersOff;
-        this.saving.set(false);
-        this.success.set('Leave rules saved.');
-        this.changed.emit();
-      },
-      error: (error: HttpErrorResponse) => {
-        this.saving.set(false);
-        this.showError(error);
-      },
-    });
+    this.api
+      .updateSettings({
+        minimumNoticeDays: this.minimumNoticeDays,
+        maxTeamMembersOff: this.maxTeamMembersOff,
+      })
+      .subscribe({
+        next: (settings) => {
+          this.minimumNoticeDays = settings.minimumNoticeDays;
+          this.maxTeamMembersOff = settings.maxTeamMembersOff;
+          this.saving.set(false);
+          this.success.set('Leave rules saved.');
+          this.changed.emit();
+        },
+        error: (error: HttpErrorResponse) => {
+          this.saving.set(false);
+          this.showError(error);
+        },
+      });
   }
 
   saveAllowance(type: LeaveType) {
@@ -355,26 +250,25 @@ export class AdminSettings implements OnInit {
 
     this.saving.set(true);
 
-    this.api.updateAllowance(
-      type.id,
-      type.yearlyAllowance,
-    ).subscribe({
-      next: (updated) => {
-        this.leaveTypes.update((types) =>
-          types.map((item) =>
-            item.id === updated.id ? updated : item,
-          ),
-        );
+    this.api
+      .updateAllowance(type.id, type.yearlyAllowance)
+      .subscribe({
+        next: (updated) => {
+          this.leaveTypes.update((types) =>
+            types.map((item) =>
+              item.id === updated.id ? updated : item,
+            ),
+          );
 
-        this.saving.set(false);
-        this.success.set(`${updated.name} allowance saved.`);
-        this.changed.emit();
-      },
-      error: (error: HttpErrorResponse) => {
-        this.saving.set(false);
-        this.showError(error);
-      },
-    });
+          this.saving.set(false);
+          this.success.set(`${updated.name} allowance saved.`);
+          this.changed.emit();
+        },
+        error: (error: HttpErrorResponse) => {
+          this.saving.set(false);
+          this.showError(error);
+        },
+      });
   }
 
   addLeaveType() {
@@ -401,28 +295,30 @@ export class AdminSettings implements OnInit {
 
     this.saving.set(true);
 
-    this.api.createLeaveType({
-      name,
-      yearlyAllowance: this.newTypeAllowance,
-    }).subscribe({
-      next: (created) => {
-        this.leaveTypes.update((types) =>
-          [...types, created].sort((a, b) =>
-            a.name.localeCompare(b.name),
-          ),
-        );
+    this.api
+      .createLeaveType({
+        name,
+        yearlyAllowance: this.newTypeAllowance,
+      })
+      .subscribe({
+        next: (created) => {
+          this.leaveTypes.update((types) =>
+            [...types, created].sort((a, b) =>
+              a.name.localeCompare(b.name),
+            ),
+          );
 
-        this.newTypeName = '';
-        this.newTypeAllowance = 0;
-        this.saving.set(false);
-        this.success.set(`${created.name} leave type created.`);
-        this.changed.emit();
-      },
-      error: (error: HttpErrorResponse) => {
-        this.saving.set(false);
-        this.showError(error);
-      },
-    });
+          this.newTypeName = '';
+          this.newTypeAllowance = 0;
+          this.saving.set(false);
+          this.success.set(`${created.name} leave type created.`);
+          this.changed.emit();
+        },
+        error: (error: HttpErrorResponse) => {
+          this.saving.set(false);
+          this.showError(error);
+        },
+      });
   }
 
   private clearMessages() {

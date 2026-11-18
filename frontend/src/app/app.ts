@@ -1,12 +1,20 @@
 import {
   Component,
+  DestroyRef,
   computed,
   inject,
   signal,
 } from '@angular/core';
+import { DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
-import { forkJoin, of } from 'rxjs';
+import {
+  NavigationEnd,
+  Router,
+  RouterOutlet,
+} from '@angular/router';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { filter, forkJoin, of } from 'rxjs';
 
 import { ApiService } from './api.service';
 import { AdminSettings } from './admin-settings';
@@ -14,6 +22,7 @@ import { HolidayAdmin } from './holiday-admin';
 import { Signup } from './signup';
 import { EmployeeAdmin } from './employee-admin';
 import { ForgotPassword } from './forgot-password';
+import { TeamAvailabilityComponent } from './team-availability';
 
 import type {
   CalendarRequest,
@@ -21,6 +30,7 @@ import type {
   LeaveRequest,
   LeaveType,
   LoginResponse,
+  PublicHoliday,
   TeamCalendar,
   TeamLeaveRequest,
 } from './api.service';
@@ -30,8 +40,11 @@ type AppTab =
   | 'request'
   | 'history'
   | 'calendar'
+  | 'availability'
   | 'approvals'
   | 'admin';
+
+type AdminSection = 'employees' | 'policies' | 'holidays';
 
 interface CalendarDay {
   date: string;
@@ -46,17 +59,26 @@ interface CalendarDay {
   standalone: true,
   imports: [
     FormsModule,
+    DatePipe,
+    RouterOutlet,
     AdminSettings,
     HolidayAdmin,
     Signup,
     EmployeeAdmin,
     ForgotPassword,
+    TeamAvailabilityComponent,
   ],
   templateUrl: './app.html',
   styleUrl: './app.scss',
 })
 export class App {
   private readonly api = inject(ApiService);
+  private readonly router = inject(Router);
+  private readonly destroyRef = inject(DestroyRef);
+
+  readonly historyPage = signal(
+    this.router.url.startsWith('/leave/requests/'),
+  );
 
   email = '';
   password = '';
@@ -93,17 +115,24 @@ export class App {
   readonly error = signal('');
   readonly success = signal('');
 
-  // My Requests filters.
+  readonly auditRequestId = signal<number | null>(null);
+
   readonly historySearch = signal('');
   readonly historyStatus = signal('ALL');
   readonly historyFrom = signal('');
   readonly historyTo = signal('');
 
-  // Manager Approvals filters.
   readonly approvalSearch = signal('');
   readonly approvalStatus = signal('ALL');
   readonly approvalFrom = signal('');
   readonly approvalTo = signal('');
+
+  readonly mobileMenuOpen = signal(false);
+  readonly showPassword = signal(false);
+  readonly adminSection = signal<AdminSection>('employees');
+
+  readonly holidays = signal<PublicHoliday[]>([]);
+  readonly holidayError = signal('');
 
   readonly filteredRequests = computed(() =>
     this.requests().filter((request) =>
@@ -130,6 +159,116 @@ export class App {
     ),
   );
 
+  readonly pendingTeamRequests = computed(() =>
+    this.teamRequests().filter(
+      (request) => request.status === 'PENDING',
+    ),
+  );
+
+  readonly approvedTeamCount = computed(() =>
+    this.teamRequests().filter(
+      (request) => request.status === 'APPROVED',
+    ).length,
+  );
+
+  readonly firstName = computed(
+    () => this.user()?.name.trim().split(/\s+/)[0] || 'there',
+  );
+
+  readonly initials = computed(() =>
+    (this.user()?.name || '')
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((part) => part[0])
+      .join('')
+      .toUpperCase(),
+  );
+
+  readonly pageTitle = computed(() => {
+    const titles: Record<AppTab, string> = {
+      dashboard: 'Overview',
+      request: 'Request leave',
+      history: 'My requests',
+      calendar: 'Team calendar',
+      availability: 'Team availability',
+      approvals: 'Approvals',
+      admin: 'Administration',
+    };
+
+    return titles[this.activeTab()];
+  });
+
+  readonly nextLeave = computed(
+    () =>
+      this.requests()
+        .filter(
+          (request) =>
+            request.status === 'APPROVED' &&
+            request.endDate.slice(0, 10) >= this.todayText(),
+        )
+        .sort((a, b) =>
+          a.startDate.localeCompare(b.startDate),
+        )[0] ?? null,
+  );
+
+  readonly upcomingHolidays = computed(() =>
+    this.holidays()
+      .filter(
+        (holiday) =>
+          holiday.date.slice(0, 10) >= this.todayText(),
+      )
+      .sort((a, b) => a.date.localeCompare(b.date))
+      .slice(0, 4),
+  );
+
+  constructor() {
+    this.router.events
+      .pipe(
+        filter(
+          (event): event is NavigationEnd =>
+            event instanceof NavigationEnd,
+        ),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe((event) => {
+        this.historyPage.set(
+          event.urlAfterRedirects.startsWith(
+            '/leave/requests/',
+          ),
+        );
+
+        window.scrollTo({ top: 0 });
+      });
+  }
+
+  navigateTab(tab: AppTab) {
+    this.closeAudit();
+    this.mobileMenuOpen.set(false);
+    this.activeTab.set(tab);
+
+    if (tab === 'calendar' && !this.isWorking()) {
+      this.loadCalendar();
+    }
+
+    window.scrollTo({ top: 0 });
+  }
+
+  openAdmin(section: AdminSection) {
+    this.adminSection.set(section);
+    this.navigateTab('admin');
+  }
+
+  greeting() {
+    const hour = new Date().getHours();
+
+    if (hour < 12) return 'Good morning';
+    if (hour < 17) return 'Good afternoon';
+
+    return 'Good evening';
+  }
+
   isWorking() {
     return (
       this.busy() ||
@@ -140,6 +279,22 @@ export class App {
     );
   }
 
+  openAudit(requestId: number) {
+    if (this.isWorking() || !this.user()) return;
+
+    this.auditRequestId.set(null);
+
+    void this.router.navigate([
+      '/leave/requests',
+      requestId,
+      'history',
+    ]);
+  }
+
+  closeAudit() {
+    this.auditRequestId.set(null);
+  }
+
   login() {
     if (this.isWorking()) return;
 
@@ -147,32 +302,39 @@ export class App {
     this.success.set('');
     this.busy.set(true);
 
-    this.api.login(
-      this.email.trim().toLowerCase(),
-      this.password,
-    ).subscribe({
-      next: (response) => {
-        this.user.set(response.user);
-        this.showSignup.set(false);
-        this.showForgotPassword.set(false);
-        this.activeTab.set('dashboard');
-        this.clearHistoryFilters();
-        this.clearApprovalFilters();
-        this.password = '';
-        this.loadDashboard();
-      },
-      error: (error: HttpErrorResponse) => {
-        this.busy.set(false);
-        this.handleError(error);
-      },
-    });
+    this.api
+      .login(
+        this.email.trim().toLowerCase(),
+        this.password,
+      )
+      .subscribe({
+        next: (response) => {
+          this.user.set(response.user);
+          this.showSignup.set(false);
+          this.showForgotPassword.set(false);
+          this.activeTab.set('dashboard');
+
+          this.closeAudit();
+          this.clearHistoryFilters();
+          this.clearApprovalFilters();
+
+          this.password = '';
+          this.loadDashboard();
+        },
+        error: (error: HttpErrorResponse) => {
+          this.busy.set(false);
+          this.handleError(error);
+        },
+      });
   }
 
   signupCompleted(email: string) {
     this.showSignup.set(false);
     this.showForgotPassword.set(false);
+
     this.email = email;
     this.password = '';
+
     this.error.set('');
     this.success.set(
       'Account created successfully. Sign in with your signup password.',
@@ -182,8 +344,10 @@ export class App {
   passwordResetCompleted(email: string) {
     this.showForgotPassword.set(false);
     this.showSignup.set(false);
+
     this.email = email;
     this.password = '';
+
     this.error.set('');
     this.success.set(
       'Password reset successfully. Sign in with your new password.',
@@ -194,6 +358,7 @@ export class App {
     if (!this.user()) return;
 
     this.busy.set(true);
+    this.loadHolidays();
 
     const teamRequests$ =
       this.user()?.role === 'MANAGER'
@@ -206,13 +371,22 @@ export class App {
       requests: this.api.getMyRequests(),
       teamRequests: teamRequests$,
     }).subscribe({
-      next: ({ balances, types, requests, teamRequests }) => {
+      next: ({
+        balances,
+        types,
+        requests,
+        teamRequests,
+      }) => {
         this.balances.set(balances);
         this.leaveTypes.set(types);
         this.requests.set(requests);
         this.teamRequests.set(teamRequests);
 
-        if (!types.some((type) => type.id === this.leaveTypeId)) {
+        if (
+          !types.some(
+            (type) => type.id === this.leaveTypeId,
+          )
+        ) {
           this.leaveTypeId = types[0]?.id ?? 0;
         }
 
@@ -237,12 +411,16 @@ export class App {
       this.year < 1900 ||
       this.year > 9999
     ) {
-      this.error.set('Enter a year between 1900 and 9999.');
+      this.error.set(
+        'Enter a year between 1900 and 9999.',
+      );
       return;
     }
 
     this.error.set('');
     this.success.set('');
+    this.closeAudit();
+
     this.loadDashboard();
   }
 
@@ -252,13 +430,21 @@ export class App {
     this.error.set('');
     this.success.set('');
 
-    if (!this.leaveTypeId || !this.startDate || !this.endDate) {
-      this.error.set('Select a leave type and both dates.');
+    if (
+      !this.leaveTypeId ||
+      !this.startDate ||
+      !this.endDate
+    ) {
+      this.error.set(
+        'Select a leave type and both dates.',
+      );
       return;
     }
 
     if (this.endDate < this.startDate) {
-      this.error.set('End date cannot precede start date.');
+      this.error.set(
+        'End date cannot precede start date.',
+      );
       return;
     }
 
@@ -271,42 +457,55 @@ export class App {
       return;
     }
 
-    const requestYear = Number(this.startDate.slice(0, 4));
+    const requestYear = Number(
+      this.startDate.slice(0, 4),
+    );
     const requestMonth = this.startDate.slice(0, 7);
 
     this.submitting.set(true);
 
-    this.api.createLeave({
-      leaveTypeId: this.leaveTypeId,
-      startDate: this.startDate,
-      endDate: this.endDate,
-      reason,
-    }).subscribe({
-      next: () => {
-        this.submitting.set(false);
-        this.success.set('Leave request submitted for approval.');
+    this.api
+      .createLeave({
+        leaveTypeId: this.leaveTypeId,
+        startDate: this.startDate,
+        endDate: this.endDate,
+        reason,
+      })
+      .subscribe({
+        next: () => {
+          this.submitting.set(false);
+          this.success.set(
+            'Leave request submitted for approval.',
+          );
 
-        this.startDate = '';
-        this.endDate = '';
-        this.reason = '';
+          this.startDate = '';
+          this.endDate = '';
+          this.reason = '';
 
-        this.year = requestYear;
-        this.calendarMonth = requestMonth;
-        this.clearHistoryFilters();
-        this.activeTab.set('history');
+          this.year = requestYear;
+          this.calendarMonth = requestMonth;
 
-        this.loadDashboard();
-      },
-      error: (error: HttpErrorResponse) => {
-        this.submitting.set(false);
-        this.handleError(error);
-      },
-    });
+          this.clearHistoryFilters();
+          this.closeAudit();
+          this.activeTab.set('history');
+
+          this.loadDashboard();
+        },
+        error: (error: HttpErrorResponse) => {
+          this.submitting.set(false);
+          this.handleError(error);
+        },
+      });
   }
 
   cancelRequest(id: number) {
     if (this.isWorking()) return;
-    if (!window.confirm('Cancel this leave request?')) return;
+
+    if (
+      !window.confirm('Cancel this leave request?')
+    ) {
+      return;
+    }
 
     this.error.set('');
     this.success.set('');
@@ -315,9 +514,12 @@ export class App {
     this.api.cancelLeave(id).subscribe({
       next: () => {
         this.cancellingId.set(null);
+        this.closeAudit();
+
         this.success.set(
           'Leave cancelled. Its days are available again.',
         );
+
         this.loadDashboard();
       },
       error: (error: HttpErrorResponse) => {
@@ -333,9 +535,16 @@ export class App {
   ) {
     if (this.isWorking()) return;
 
-    const action = status === 'APPROVED' ? 'Approve' : 'Reject';
+    const action =
+      status === 'APPROVED' ? 'Approve' : 'Reject';
 
-    if (!window.confirm(`${action} this leave request?`)) return;
+    if (
+      !window.confirm(
+        `${action} this leave request?`,
+      )
+    ) {
+      return;
+    }
 
     this.error.set('');
     this.success.set('');
@@ -344,11 +553,14 @@ export class App {
     this.api.decideLeave(id, status).subscribe({
       next: () => {
         this.decidingId.set(null);
+        this.closeAudit();
+
         this.success.set(
           status === 'APPROVED'
             ? 'Leave request approved.'
             : 'Leave request rejected.',
         );
+
         this.loadDashboard();
       },
       error: (error: HttpErrorResponse) => {
@@ -389,14 +601,17 @@ export class App {
       request.leaveType.name,
       request.reason,
       String(request.id),
-    ].join(' ').toLowerCase();
+    ]
+      .join(' ')
+      .toLowerCase();
 
     const start = request.startDate.slice(0, 10);
     const end = request.endDate.slice(0, 10);
 
     return (
       (!query || text.includes(query)) &&
-      (status === 'ALL' || request.status === status) &&
+      (status === 'ALL' ||
+        request.status === status) &&
       (!from || end >= from) &&
       (!to || start <= to)
     );
@@ -405,10 +620,14 @@ export class App {
   loadCalendar() {
     if (this.isWorking() || !this.user()) return;
 
-    const match = /^(\d{4})-(\d{2})$/.exec(this.calendarMonth);
+    const match = /^(\d{4})-(\d{2})$/.exec(
+      this.calendarMonth,
+    );
 
     if (!match) {
-      this.calendarError.set('Choose a valid month.');
+      this.calendarError.set(
+        'Choose a valid month.',
+      );
       return;
     }
 
@@ -421,7 +640,9 @@ export class App {
       month < 1 ||
       month > 12
     ) {
-      this.calendarError.set('Choose a valid month.');
+      this.calendarError.set(
+        'Choose a valid month.',
+      );
       return;
     }
 
@@ -435,22 +656,38 @@ export class App {
       next: (calendar) => {
         this.calendar.set(calendar);
 
-        const first = new Date(Date.UTC(year, month - 1, 1));
+        const first = new Date(
+          Date.UTC(year, month - 1, 1),
+        );
+
         const dayCount = new Date(
           Date.UTC(year, month, 0),
         ).getUTCDate();
 
-        const padding = (first.getUTCDay() + 6) % 7;
+        const padding =
+          (first.getUTCDay() + 6) % 7;
 
         this.calendarPadding.set(
-          Array.from({ length: padding }, (_, index) => index),
+          Array.from(
+            { length: padding },
+            (_, index) => index,
+          ),
         );
 
         const days: CalendarDay[] = [];
 
-        for (let day = 1; day <= dayCount; day++) {
-          const date = new Date(Date.UTC(year, month - 1, day));
-          const key = date.toISOString().slice(0, 10);
+        for (
+          let day = 1;
+          day <= dayCount;
+          day++
+        ) {
+          const date = new Date(
+            Date.UTC(year, month - 1, day),
+          );
+
+          const key = date
+            .toISOString()
+            .slice(0, 10);
 
           const weekend =
             date.getUTCDay() === 0 ||
@@ -458,7 +695,8 @@ export class App {
 
           const holidays = calendar.holidays
             .filter(
-              (holiday) => holiday.date.slice(0, 10) === key,
+              (holiday) =>
+                holiday.date.slice(0, 10) === key,
             )
             .map((holiday) => holiday.name);
 
@@ -467,8 +705,14 @@ export class App {
               ? []
               : calendar.requests.filter(
                   (request) =>
-                    request.startDate.slice(0, 10) <= key &&
-                    request.endDate.slice(0, 10) >= key,
+                    request.startDate.slice(
+                      0,
+                      10,
+                    ) <= key &&
+                    request.endDate.slice(
+                      0,
+                      10,
+                    ) >= key,
                 );
 
           days.push({
@@ -507,20 +751,29 @@ export class App {
   usedPercent(balance: LeaveBalance) {
     if (balance.allowance <= 0) return 0;
 
-    const reserved = balance.pending + balance.approved;
+    const reserved =
+      balance.pending + balance.approved;
 
     return Math.min(
       100,
-      Math.max(0, (reserved / balance.allowance) * 100),
+      Math.max(
+        0,
+        (reserved / balance.allowance) * 100,
+      ),
     );
   }
 
   logout() {
+    this.mobileMenuOpen.set(false);
+    this.showPassword.set(false);
+    this.holidays.set([]);
     this.showSignup.set(false);
     this.showForgotPassword.set(false);
     this.activeTab.set('dashboard');
+
     this.api.logout();
 
+    this.closeAudit();
     this.clearHistoryFilters();
     this.clearApprovalFilters();
 
@@ -550,6 +803,20 @@ export class App {
     this.submitting.set(false);
     this.cancellingId.set(null);
     this.decidingId.set(null);
+
+    if (this.historyPage()) {
+      void this.router.navigateByUrl('/');
+    }
+  }
+
+  private todayText() {
+    const now = new Date();
+
+    return [
+      String(now.getFullYear()),
+      String(now.getMonth() + 1).padStart(2, '0'),
+      String(now.getDate()).padStart(2, '0'),
+    ].join('-');
   }
 
   private currentMonth() {
@@ -561,9 +828,31 @@ export class App {
     );
   }
 
+  private loadHolidays() {
+    this.holidayError.set('');
+
+    this.api
+      .getHolidays()
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (holidays) => {
+          this.holidays.set(holidays);
+        },
+        error: () => {
+          this.holidayError.set(
+            'Public holidays could not be loaded. Refresh to try again.',
+          );
+        },
+      });
+  }
+
   private handleError(error: HttpErrorResponse) {
-    if (error.status === 401 && this.user()) {
+    if (
+      error.status === 401 &&
+      this.user()
+    ) {
       this.logout();
+
       this.error.set(
         'Your session expired. Please sign in again.',
       );

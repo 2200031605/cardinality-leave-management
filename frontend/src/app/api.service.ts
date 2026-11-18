@@ -80,6 +80,34 @@ export interface TeamCalendar {
   holidays: PublicHoliday[];
 }
 
+export interface TeamAvailabilityMember {
+  id: number;
+  name: string;
+}
+
+export interface TeamAvailabilityDay {
+  date: string;
+  workingDay: boolean;
+  weekend: boolean;
+  holiday: string | null;
+  totalMembers: number;
+  availableCount: number;
+  pendingCount: number;
+  approvedCount: number;
+  available: TeamAvailabilityMember[];
+  pending: TeamAvailabilityMember[];
+  approved: TeamAvailabilityMember[];
+}
+
+export interface TeamAvailability {
+  teamId: number;
+  startDate: string;
+  endDate: string;
+  totalMembers: number;
+  workingDays: number;
+  days: TeamAvailabilityDay[];
+}
+
 export interface AppSettings {
   id: number;
   minimumNoticeDays: number;
@@ -92,18 +120,45 @@ export interface ManagedEmployee {
   email: string;
   teamId: number | null;
   managerId: number | null;
-  team: { id: number; name: string } | null;
-  manager: { id: number; name: string } | null;
+  team: {
+    id: number;
+    name: string;
+  } | null;
+  manager: {
+    id: number;
+    name: string;
+  } | null;
 }
 
 export interface EmployeeOptions {
-  teams: { id: number; name: string }[];
+  teams: {
+    id: number;
+    name: string;
+  }[];
   managers: {
     id: number;
     name: string;
     email: string;
     teamId: number | null;
   }[];
+}
+
+export interface LeaveAuditEvent {
+  id: number;
+  action: 'REQUESTED' | 'APPROVED' | 'REJECTED' | 'CANCELLED';
+  fromStatus:
+    | 'PENDING'
+    | 'APPROVED'
+    | 'REJECTED'
+    | 'CANCELLED'
+    | null;
+  toStatus: 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED';
+  createdAt: string;
+  actor: {
+    id: number;
+    name: string;
+    role: 'EMPLOYEE' | 'MANAGER' | 'ADMIN';
+  };
 }
 
 @Injectable({ providedIn: 'root' })
@@ -180,7 +235,10 @@ export class ApiService {
     );
   }
 
-  decideLeave(id: number, status: 'APPROVED' | 'REJECTED') {
+  decideLeave(
+    id: number,
+    status: 'APPROVED' | 'REJECTED',
+  ) {
     return this.http.patch(
       `${this.baseUrl}/leave/requests/${id}/decision`,
       { status },
@@ -193,6 +251,22 @@ export class ApiService {
       `${this.baseUrl}/leave/calendar`,
       {
         params: { year, month },
+        headers: this.headers,
+      },
+    );
+  }
+
+  getTeamAvailability(
+    startDate: string,
+    endDate: string,
+  ) {
+    return this.http.get<TeamAvailability>(
+      `${this.baseUrl}/leave/availability`,
+      {
+        params: {
+          startDate,
+          endDate,
+        },
         headers: this.headers,
       },
     );
@@ -216,7 +290,10 @@ export class ApiService {
     );
   }
 
-  updateAllowance(id: number, yearlyAllowance: number) {
+  updateAllowance(
+    id: number,
+    yearlyAllowance: number,
+  ) {
     return this.http.patch<LeaveType>(
       `${this.baseUrl}/admin/leave-types/${id}`,
       { yearlyAllowance },
@@ -231,7 +308,10 @@ export class ApiService {
     );
   }
 
-  createHoliday(data: { name: string; date: string }) {
+  createHoliday(data: {
+    name: string;
+    date: string;
+  }) {
     return this.http.post<PublicHoliday>(
       `${this.baseUrl}/holidays`,
       data,
@@ -240,79 +320,99 @@ export class ApiService {
   }
 
   createLeaveType(data: {
-  name: string;
-  yearlyAllowance: number;
-}) {
-  return this.http.post<LeaveType>(
-    `${this.baseUrl}/admin/leave-types`,
-    data,
-    { headers: this.headers },
-  );
-}
-signup(data: {
-  name: string;
-  email: string;
-  password: string;
-  confirmPassword: string;
-}) {
-  return this.http.post<{
-    message: string;
+    name: string;
+    yearlyAllowance: number;
+  }) {
+    return this.http.post<LeaveType>(
+      `${this.baseUrl}/admin/leave-types`,
+      data,
+      { headers: this.headers },
+    );
+  }
+
+  signup(data: {
+    name: string;
     email: string;
-    resendAfterSeconds: number;
-  }>(`${this.baseUrl}/auth/signup`, data);
-}
+    password: string;
+    confirmPassword: string;
+  }) {
+    return this.http.post<{
+      message: string;
+      email: string;
+      resendAfterSeconds: number;
+    }>(
+      `${this.baseUrl}/auth/signup`,
+      data,
+    );
+  }
 
-verifySignup(email: string, otp: string) {
-  return this.http.post<{
-    message: string;
-    confirmationEmailSent: boolean;
-  }>(`${this.baseUrl}/auth/verify-signup`, { email, otp });
-}
+  verifySignup(email: string, otp: string) {
+    return this.http.post<{
+      message: string;
+      confirmationEmailSent: boolean;
+    }>(
+      `${this.baseUrl}/auth/verify-signup`,
+      { email, otp },
+    );
+  }
 
-getEmployees() {
-  return this.http.get<ManagedEmployee[]>(
-    `${this.baseUrl}/admin/employees`,
-    { headers: this.headers },
-  );
-}
+  getEmployees() {
+    return this.http.get<ManagedEmployee[]>(
+      `${this.baseUrl}/admin/employees`,
+      { headers: this.headers },
+    );
+  }
 
-getEmployeeOptions() {
-  return this.http.get<EmployeeOptions>(
-    `${this.baseUrl}/admin/employee-options`,
-    { headers: this.headers },
-  );
-}
+  getEmployeeOptions() {
+    return this.http.get<EmployeeOptions>(
+      `${this.baseUrl}/admin/employee-options`,
+      { headers: this.headers },
+    );
+  }
 
-assignEmployee(
-  id: number,
-  data: { teamId: number; managerId: number },
-) {
-  return this.http.patch<ManagedEmployee>(
-    `${this.baseUrl}/admin/employees/${id}/assignment`,
-    data,
-    { headers: this.headers },
-  );
-}
+  assignEmployee(
+    id: number,
+    data: {
+      teamId: number;
+      managerId: number;
+    },
+  ) {
+    return this.http.patch<ManagedEmployee>(
+      `${this.baseUrl}/admin/employees/${id}/assignment`,
+      data,
+      { headers: this.headers },
+    );
+  }
 
-forgotPassword(email: string) {
-  return this.http.post<{
-    message: string;
-    resendAfterSeconds: number;
-    expiresInSeconds: number;
-  }>(`${this.baseUrl}/auth/forgot-password`, { email });
-}
+  forgotPassword(email: string) {
+    return this.http.post<{
+      message: string;
+      resendAfterSeconds: number;
+      expiresInSeconds: number;
+    }>(
+      `${this.baseUrl}/auth/forgot-password`,
+      { email },
+    );
+  }
 
-resetPassword(data: {
-  email: string;
-  otp: string;
-  password: string;
-  confirmPassword: string;
-}) {
-  return this.http.post<{ message: string }>(
-    `${this.baseUrl}/auth/reset-password`,
-    data,
-  );
-}
+  resetPassword(data: {
+    email: string;
+    otp: string;
+    password: string;
+    confirmPassword: string;
+  }) {
+    return this.http.post<{ message: string }>(
+      `${this.baseUrl}/auth/reset-password`,
+      data,
+    );
+  }
+
+  getLeaveAudit(requestId: number) {
+    return this.http.get<LeaveAuditEvent[]>(
+      `${this.baseUrl}/leave/requests/${requestId}/audit`,
+      { headers: this.headers },
+    );
+  }
 
   logout() {
     this.token = '';

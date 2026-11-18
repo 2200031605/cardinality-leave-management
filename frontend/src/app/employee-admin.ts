@@ -28,6 +28,7 @@ import type {
         </div>
 
         <button
+          class="secondary"
           type="button"
           (click)="load()"
           [disabled]="busy()"
@@ -98,9 +99,7 @@ import type {
 
           <button
             type="submit"
-            [disabled]="
-              busy() || !employeeId || !teamId || !managerId
-            "
+            [disabled]="busy() || !employeeId || !teamId || !managerId"
           >
             Save assignment
           </button>
@@ -140,125 +139,7 @@ import type {
       </div>
     </section>
   `,
-  styles: `
-    :host {
-      display: block;
-      margin-top: 28px;
-    }
-
-    * {
-      box-sizing: border-box;
-    }
-
-    .panel {
-      padding: 28px;
-      background: white;
-      border: 1px solid #e1e7ef;
-      border-radius: 18px;
-    }
-
-    .heading {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      flex-wrap: wrap;
-      gap: 16px;
-    }
-
-    h2 {
-      margin-top: 0;
-    }
-
-    p {
-      color: #627088;
-      line-height: 1.6;
-    }
-
-    fieldset {
-      display: grid;
-      gap: 12px;
-      max-width: 600px;
-      min-width: 0;
-      margin: 24px 0;
-      padding: 0;
-      border: 0;
-    }
-
-    label {
-      font-size: 14px;
-      font-weight: 600;
-    }
-
-    select {
-      width: 100%;
-      min-width: 0;
-      padding: 12px;
-      border: 1px solid #cbd4e1;
-      border-radius: 8px;
-      background: white;
-      font: inherit;
-    }
-
-    button {
-      padding: 12px 18px;
-      border: 0;
-      border-radius: 8px;
-      background: #4263eb;
-      color: white;
-      font: inherit;
-      font-weight: 600;
-      cursor: pointer;
-    }
-
-    button:disabled {
-      opacity: 0.6;
-      cursor: default;
-    }
-
-    button:focus-visible,
-    select:focus-visible {
-      outline: 3px solid #a7b8ff;
-      outline-offset: 3px;
-    }
-
-    .table-scroll {
-      overflow-x: auto;
-    }
-
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      text-align: left;
-    }
-
-    th,
-    td {
-      padding: 14px 12px;
-      border-bottom: 1px solid #e1e7ef;
-    }
-
-    .error,
-    .success {
-      padding: 14px;
-      border-radius: 8px;
-    }
-
-    .error {
-      background: #fff0f0;
-      color: #a32222;
-    }
-
-    .success {
-      background: #eaf8ef;
-      color: #21643b;
-    }
-
-    @media (max-width: 600px) {
-      .panel {
-        padding: 20px;
-      }
-    }
-  `,
+  styleUrl: './workspace-panels.scss',
 })
 export class EmployeeAdmin implements OnInit {
   private readonly api = inject(ApiService);
@@ -346,10 +227,11 @@ export class EmployeeAdmin implements OnInit {
 
     this.busy.set(true);
 
-    this.api.assignEmployee(this.employeeId, {
-      teamId: this.teamId,
-      managerId: this.managerId,
-    })
+    this.api
+      .assignEmployee(this.employeeId, {
+        teamId: this.teamId,
+        managerId: this.managerId,
+      })
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (updated) => {

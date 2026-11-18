@@ -17,7 +17,19 @@ import { ApiService } from './api.service';
   imports: [FormsModule],
   template: `
     <section class="signup-card">
-      <h2>{{ verifying() ? 'Verify your email' : 'Create account' }}</h2>
+      <div class="auth-steps" aria-label="Signup progress">
+        <span [class.current]="!verifying()">
+          1 · Account details
+        </span>
+        <i aria-hidden="true"></i>
+        <span [class.current]="verifying()">
+          2 · Verify email
+        </span>
+      </div>
+
+      <h2>
+        {{ verifying() ? 'Verify your email' : 'Create account' }}
+      </h2>
 
       @if (error()) {
         <p class="error" role="alert">{{ error() }}</p>
@@ -59,7 +71,7 @@ import { ApiService } from './api.service';
             <input
               id="signupPassword"
               name="signupPassword"
-              type="password"
+              [type]="showPassword() ? 'text' : 'password'"
               [(ngModel)]="password"
               autocomplete="new-password"
               minlength="8"
@@ -67,11 +79,27 @@ import { ApiService } from './api.service';
               required
             />
 
+            <div class="password-guidance">
+              <span [class.met]="password.length >= 8">
+                {{ password.length >= 8 ? '✓' : '○' }}
+                At least 8 characters
+              </span>
+
+              <button
+                class="link"
+                type="button"
+                (click)="showPassword.set(!showPassword())"
+                [attr.aria-pressed]="showPassword()"
+              >
+                {{ showPassword() ? 'Hide passwords' : 'Show passwords' }}
+              </button>
+            </div>
+
             <label for="confirmPassword">Confirm password</label>
             <input
               id="confirmPassword"
               name="confirmPassword"
-              type="password"
+              [type]="showPassword() ? 'text' : 'password'"
               [(ngModel)]="confirmPassword"
               autocomplete="new-password"
               minlength="8"
@@ -79,11 +107,28 @@ import { ApiService } from './api.service';
               required
             />
 
+            @if (confirmPassword && password !== confirmPassword) {
+              <p class="field-hint" role="status">
+                Passwords must match.
+              </p>
+            }
+
             <button
               type="submit"
-              [disabled]="signupForm.invalid || busy()"
+              [disabled]="
+                signupForm.invalid ||
+                busy() ||
+                cooldown() > 0 ||
+                password !== confirmPassword
+              "
             >
-              {{ busy() ? 'Sending…' : 'Send verification code' }}
+              {{
+                busy()
+                  ? 'Sending…'
+                  : cooldown() > 0
+                    ? 'Try again in ' + cooldown() + 's'
+                    : 'Send verification code'
+              }}
             </button>
           </fieldset>
         </form>
@@ -112,7 +157,11 @@ import { ApiService } from './api.service';
               type="submit"
               [disabled]="otpForm.invalid || busy()"
             >
-              {{ busy() ? 'Verifying…' : 'Verify and create account' }}
+              {{
+                busy()
+                  ? 'Verifying…'
+                  : 'Verify and create account'
+              }}
             </button>
           </fieldset>
         </form>
@@ -150,118 +199,24 @@ import { ApiService } from './api.service';
       </button>
     </section>
   `,
-  styles: `
-    :host {
-      display: block;
-    }
-
-    * {
-      box-sizing: border-box;
-    }
-
-    .signup-card {
-      max-width: 460px;
-      margin: 40px auto;
-      padding: 28px;
-      background: white;
-      border: 1px solid #e1e7ef;
-      border-radius: 18px;
-    }
-
-    h2 {
-      margin-top: 0;
-    }
-
-    p {
-      color: #627088;
-      line-height: 1.6;
-      overflow-wrap: anywhere;
-    }
-
-    fieldset {
-      display: grid;
-      gap: 12px;
-      min-width: 0;
-      margin: 20px 0;
-      padding: 0;
-      border: 0;
-    }
-
-    label {
-      font-size: 14px;
-      font-weight: 600;
-    }
-
-    input {
-      width: 100%;
-      min-width: 0;
-      padding: 12px;
-      border: 1px solid #cbd4e1;
-      border-radius: 8px;
-      font: inherit;
-    }
-
-    button {
-      padding: 12px 16px;
-      border: 0;
-      border-radius: 8px;
-      background: #4263eb;
-      color: white;
-      font: inherit;
-      font-weight: 600;
-      cursor: pointer;
-    }
-
-    button:disabled {
-      opacity: 0.6;
-      cursor: default;
-    }
-
-    input:focus-visible,
-    button:focus-visible {
-      outline: 3px solid #a7b8ff;
-      outline-offset: 3px;
-    }
-
-    .secondary {
-      width: 100%;
-      background: #edf1fa;
-      color: #334155;
-    }
-
-    .link {
-      display: block;
-      margin-top: 12px;
-      padding-left: 0;
-      background: transparent;
-      color: #4263eb;
-    }
-
-    .error,
-    .success {
-      padding: 12px;
-      border-radius: 8px;
-    }
-
-    .error {
-      background: #fff0f0;
-      color: #a32222;
-    }
-
-    .success {
-      background: #eaf8ef;
-      color: #21643b;
-    }
-  `,
+  styleUrl: './auth-forms.scss',
 })
 export class Signup implements OnDestroy {
   private readonly api = inject(ApiService);
   private readonly destroyRef = inject(DestroyRef);
+
   private timer?: ReturnType<typeof setInterval>;
   private resendAt = 0;
 
   readonly completed = output<string>();
   readonly cancelled = output<void>();
+
+  readonly showPassword = signal(false);
+  readonly verifying = signal(false);
+  readonly busy = signal(false);
+  readonly error = signal('');
+  readonly message = signal('');
+  readonly cooldown = signal(0);
 
   name = '';
   email = '';
@@ -269,19 +224,16 @@ export class Signup implements OnDestroy {
   confirmPassword = '';
   otp = '';
 
-  readonly verifying = signal(false);
-  readonly busy = signal(false);
-  readonly error = signal('');
-  readonly message = signal('');
-  readonly cooldown = signal(0);
-
   sendCode() {
     if (this.busy() || this.cooldown() > 0) return;
 
     this.error.set('');
     this.message.set('');
 
-    if (this.name.trim().length < 2 || !this.email.trim()) {
+    if (
+      this.name.trim().length < 2 ||
+      !this.email.trim()
+    ) {
       this.error.set('Enter your name and email.');
       return;
     }
@@ -303,20 +255,23 @@ export class Signup implements OnDestroy {
 
     this.busy.set(true);
 
-    this.api.signup({
-      name: this.name.trim(),
-      email: this.email.trim().toLowerCase(),
-      password: this.password,
-      confirmPassword: this.confirmPassword,
-    })
+    this.api
+      .signup({
+        name: this.name.trim(),
+        email: this.email.trim().toLowerCase(),
+        password: this.password,
+        confirmPassword: this.confirmPassword,
+      })
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (response) => {
           this.email = response.email;
           this.otp = '';
+
           this.verifying.set(true);
           this.busy.set(false);
           this.message.set(response.message);
+
           this.startCooldown(response.resendAfterSeconds);
         },
         error: (error: HttpErrorResponse) => {
@@ -341,13 +296,15 @@ export class Signup implements OnDestroy {
 
     this.busy.set(true);
 
-    this.api.verifySignup(this.email, otp)
+    this.api
+      .verifySignup(this.email, otp)
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: () => {
           this.password = '';
           this.confirmPassword = '';
           this.otp = '';
+
           this.busy.set(false);
           this.completed.emit(this.email);
         },
@@ -366,7 +323,9 @@ export class Signup implements OnDestroy {
   }
 
   private startCooldown(seconds: number) {
-    if (this.timer) clearInterval(this.timer);
+    if (this.timer) {
+      clearInterval(this.timer);
+    }
 
     this.resendAt = Date.now() + seconds * 1000;
     this.cooldown.set(seconds);
@@ -401,7 +360,10 @@ export class Signup implements OnDestroy {
   }
 
   ngOnDestroy() {
-    if (this.timer) clearInterval(this.timer);
+    if (this.timer) {
+      clearInterval(this.timer);
+    }
+
     this.password = '';
     this.confirmPassword = '';
     this.otp = '';

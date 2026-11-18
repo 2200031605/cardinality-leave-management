@@ -1,4 +1,9 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import {
+  Component,
+  OnInit,
+  inject,
+  signal,
+} from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
 import { ApiService } from './api.service';
@@ -51,9 +56,10 @@ import type { PublicHoliday } from './api.service';
         </fieldset>
       </form>
 
-      <div class="list-heading">
+      <div class="heading">
         <h3>Configured holidays</h3>
         <button
+          class="secondary"
           type="button"
           (click)="load()"
           [disabled]="loading() || saving()"
@@ -93,124 +99,7 @@ import type { PublicHoliday } from './api.service';
       </div>
     </section>
   `,
-  styles: `
-    :host {
-      display: block;
-      margin-top: 28px;
-    }
-
-    * {
-      box-sizing: border-box;
-    }
-
-    .panel {
-      padding: 28px;
-      background: white;
-      border: 1px solid #e1e7ef;
-      border-radius: 18px;
-    }
-
-    h2 {
-      margin-top: 0;
-    }
-
-    p {
-      color: #627088;
-      line-height: 1.6;
-    }
-
-    fieldset {
-      display: grid;
-      gap: 12px;
-      max-width: 560px;
-      min-width: 0;
-      margin: 24px 0;
-      padding: 0;
-      border: 0;
-    }
-
-    label {
-      font-weight: 600;
-      font-size: 14px;
-    }
-
-    input {
-      min-width: 0;
-      padding: 12px;
-      border: 1px solid #cbd4e1;
-      border-radius: 8px;
-      font: inherit;
-    }
-
-    button {
-      padding: 12px 18px;
-      border: 0;
-      border-radius: 8px;
-      background: #4263eb;
-      color: white;
-      font: inherit;
-      font-weight: 600;
-      cursor: pointer;
-    }
-
-    button:disabled {
-      opacity: 0.6;
-      cursor: default;
-    }
-
-    input:focus-visible,
-    button:focus-visible {
-      outline: 3px solid #a7b8ff;
-      outline-offset: 3px;
-    }
-
-    .list-heading {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      flex-wrap: wrap;
-      gap: 12px;
-      margin-top: 28px;
-    }
-
-    .table-scroll {
-      overflow-x: auto;
-    }
-
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      text-align: left;
-    }
-
-    th,
-    td {
-      padding: 14px 12px;
-      border-bottom: 1px solid #e1e7ef;
-    }
-
-    .error,
-    .success {
-      padding: 14px;
-      border-radius: 8px;
-    }
-
-    .error {
-      background: #fff0f0;
-      color: #a32222;
-    }
-
-    .success {
-      background: #eaf8ef;
-      color: #21643b;
-    }
-
-    @media (max-width: 600px) {
-      .panel {
-        padding: 20px;
-      }
-    }
-  `,
+  styleUrl: './workspace-panels.scss',
 })
 export class HolidayAdmin implements OnInit {
   private readonly api = inject(ApiService);
@@ -261,24 +150,26 @@ export class HolidayAdmin implements OnInit {
 
     this.saving.set(true);
 
-    this.api.createHoliday({ name, date: this.date }).subscribe({
-      next: (holiday) => {
-        this.holidays.update((holidays) =>
-          [...holidays, holiday].sort(
-            (a, b) => a.date.localeCompare(b.date),
-          ),
-        );
+    this.api
+      .createHoliday({ name, date: this.date })
+      .subscribe({
+        next: (holiday) => {
+          this.holidays.update((holidays) =>
+            [...holidays, holiday].sort(
+              (a, b) => a.date.localeCompare(b.date),
+            ),
+          );
 
-        this.name = '';
-        this.date = '';
-        this.saving.set(false);
-        this.success.set('Public holiday added.');
-      },
-      error: (error: HttpErrorResponse) => {
-        this.saving.set(false);
-        this.showError(error);
-      },
-    });
+          this.name = '';
+          this.date = '';
+          this.saving.set(false);
+          this.success.set('Public holiday added.');
+        },
+        error: (error: HttpErrorResponse) => {
+          this.saving.set(false);
+          this.showError(error);
+        },
+      });
   }
 
   private showError(error: HttpErrorResponse) {

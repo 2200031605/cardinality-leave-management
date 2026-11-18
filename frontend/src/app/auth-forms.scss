@@ -1,0 +1,103 @@
+:host {
+  display: block;
+}
+
+.signup-card,
+.reset-card {
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  border: 0;
+}
+
+h2 {
+  font-size: 28px;
+  line-height: 1.25;
+  letter-spacing: -1px;
+  margin: 0 0 12px;
+}
+
+p {
+  font-size: 12px;
+  line-height: 1.8;
+}
+
+form {
+  margin: 24px 0 14px;
+}
+
+fieldset {
+  gap: 9px;
+}
+
+button[type='submit'] {
+  width: 100%;
+  margin-top: 14px;
+  padding: 13px;
+}
+
+.link {
+  display: block;
+  margin-top: 15px;
+}
+
+.secondary {
+  margin-top: 10px;
+  width: 100%;
+}
+
+.auth-steps {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 28px;
+  font-size: 9px;
+  font-weight: 600;
+  color: #a3a8b7;
+}
+
+.auth-steps i {
+  height: 1px;
+  width: 24px;
+  background: #e6e2f2;
+}
+
+.auth-steps .current {
+  color: var(--primary);
+}
+
+input[autocomplete='one-time-code'] {
+  letter-spacing: 8px;
+  font-size: 23px;
+  text-align: center;
+  padding: 14px;
+}
+
+input.ng-invalid.ng-touched {
+  border-color: #d78a8a;
+}
+
+.password-guidance {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: center;
+  font-size: 9px;
+  color: #979eae;
+}
+
+.password-guidance .link {
+  margin: 0;
+  font-size: 9px;
+}
+
+.password-guidance .met {
+  color: #328365;
+}
+
+.field-hint {
+  font-size: 10px;
+  color: #b45b5b;
+  margin: 0;
+}

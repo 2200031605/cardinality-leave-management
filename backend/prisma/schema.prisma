@@ -21,6 +21,13 @@ enum LeaveStatus {
   CANCELLED
 }
 
+enum LeaveAuditAction {
+  REQUESTED
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
 model User {
   id           Int    @id @default(autoincrement())
   name         String
@@ -36,9 +43,10 @@ model User {
   manager   User?  @relation("Reporting", fields: [managerId], references: [id])
   reports   User[] @relation("Reporting")
 
-  requests  LeaveRequest[] @relation("EmployeeRequests")
-  decisions LeaveRequest[] @relation("ManagerDecisions")
-  balances  LeaveBalance[]
+  requests    LeaveRequest[] @relation("EmployeeRequests")
+  decisions   LeaveRequest[] @relation("ManagerDecisions")
+  balances    LeaveBalance[]
+  auditEvents LeaveAudit[]
 
   createdAt DateTime @default(now())
 }
@@ -88,11 +96,28 @@ model LeaveRequest {
   leaveType LeaveType @relation(fields: [leaveTypeId], references: [id])
   decidedBy User?     @relation("ManagerDecisions", fields: [decidedById], references: [id])
 
+  auditEvents LeaveAudit[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([userId, startDate, endDate])
   @@index([status])
+}
+
+model LeaveAudit {
+  id         Int              @id @default(autoincrement())
+  requestId  Int
+  actorId    Int
+  action     LeaveAuditAction
+  fromStatus LeaveStatus?
+  toStatus   LeaveStatus
+  createdAt  DateTime         @default(now())
+
+  request LeaveRequest @relation(fields: [requestId], references: [id], onDelete: Restrict)
+  actor   User         @relation(fields: [actorId], references: [id], onDelete: Restrict)
+
+  @@index([requestId, createdAt])
 }
 
 model PublicHoliday {

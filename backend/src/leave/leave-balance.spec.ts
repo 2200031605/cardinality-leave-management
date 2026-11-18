@@ -10,7 +10,7 @@ import { MailService } from '../mail/mail.service';
 
 describe('Leave cancellation and balances', () => {
   it.each(['PENDING', 'APPROVED'] as const)(
-    'restores two days after cancelling a %s request',
+    'restores two days and records cancellation of a %s request',
     async (initialStatus) => {
       const request = {
         id: 100,
@@ -48,7 +48,7 @@ describe('Leave cancellation and balances', () => {
           where: {
             id: number;
             userId: number;
-            status: { in: string[] };
+            status: string;
           };
           data: {
             status: 'CANCELLED';
@@ -57,7 +57,7 @@ describe('Leave cancellation and balances', () => {
           if (
             query.where.id !== request.id ||
             query.where.userId !== request.userId ||
-            !query.where.status.in.includes(request.status)
+            query.where.status !== request.status
           ) {
             return { count: 0 };
           }
@@ -68,7 +68,11 @@ describe('Leave cancellation and balances', () => {
         },
       );
 
-      const prisma = {
+      const createAudit = jest.fn(
+        async (_data: unknown) => ({ id: 1 }),
+      );
+
+      const database = {
         leaveType: {
           findMany: jest.fn(async () => [
             {
@@ -84,6 +88,9 @@ describe('Leave cancellation and balances', () => {
         publicHoliday: {
           findMany: jest.fn(async () => []),
         },
+        leaveAudit: {
+          create: createAudit,
+        },
         leaveRequest: {
           findMany,
           findUnique: jest.fn(
@@ -94,6 +101,17 @@ describe('Leave cancellation and balances', () => {
             async () => ({ ...request }),
           ),
         },
+      };
+
+      const prisma = {
+        ...database,
+        $transaction: jest.fn(
+          async (
+            callback: (
+              client: typeof database,
+            ) => Promise<unknown>,
+          ) => callback(database),
+        ),
       };
 
       const mail = {
@@ -128,6 +146,16 @@ describe('Leave cancellation and balances', () => {
 
       expect(cancelled.status).toBe('CANCELLED');
 
+      expect(createAudit).toHaveBeenCalledWith({
+        data: {
+          requestId: 100,
+          actorId: 1,
+          action: 'CANCELLED',
+          fromStatus: initialStatus,
+          toStatus: 'CANCELLED',
+        },
+      });
+
       const after = await service.getMyBalances(1, 2027);
 
       expect(after[0]).toEqual(
@@ -143,12 +171,14 @@ describe('Leave cancellation and balances', () => {
         after[0].remaining - before[0].remaining,
       ).toBe(2);
 
-      // Cancellation cannot restore the same days twice.
+      // Repeating cancellation cannot restore days twice.
       await expect(
         service.cancel(1, request.id),
       ).rejects.toThrow(
         'Only pending or approved requests can be cancelled',
       );
+
+      expect(createAudit).toHaveBeenCalledTimes(1);
 
       const finalBalance =
         await service.getMyBalances(1, 2027);

@@ -72,9 +72,7 @@ export class LeaveService {
 
   getTeamRequests(managerId: number) {
     return this.prisma.leaveRequest.findMany({
-      where: {
-        user: { managerId },
-      },
+      where: { user: { managerId } },
       include: {
         user: {
           select: {
@@ -101,9 +99,7 @@ export class LeaveService {
     }
 
     if (reason.length < 3) {
-      throw new BadRequestException(
-        'Enter a meaningful reason',
-      );
+      throw new BadRequestException('Enter a meaningful reason');
     }
 
     if (+end - +start > 366 * DAY) {
@@ -132,9 +128,7 @@ export class LeaveService {
           }
 
           if (!type) {
-            throw new BadRequestException(
-              'Leave type not found',
-            );
+            throw new BadRequestException('Leave type not found');
           }
 
           if (!settings) {
@@ -150,24 +144,19 @@ export class LeaveService {
           }
 
           const now = new Date();
-
           const today = Date.UTC(
             now.getUTCFullYear(),
             now.getUTCMonth(),
             now.getUTCDate(),
           );
 
-          if (
-            +start <
-            today + settings.minimumNoticeDays * DAY
-          ) {
+          if (+start < today + settings.minimumNoticeDays * DAY) {
             throw new BadRequestException(
               `At least ${settings.minimumNoticeDays} calendar days notice required`,
             );
           }
 
-          const holidayRows =
-            await tx.publicHoliday.findMany();
+          const holidayRows = await tx.publicHoliday.findMany();
 
           const holidays = new Set(
             holidayRows.map((holiday) =>
@@ -183,17 +172,14 @@ export class LeaveService {
             );
           }
 
-          const overlap =
-            await tx.leaveRequest.findFirst({
-              where: {
-                userId,
-                status: {
-                  in: ['PENDING', 'APPROVED'],
-                },
-                startDate: { lte: end },
-                endDate: { gte: start },
-              },
-            });
+          const overlap = await tx.leaveRequest.findFirst({
+            where: {
+              userId,
+              status: { in: ['PENDING', 'APPROVED'] },
+              startDate: { lte: end },
+              endDate: { gte: start },
+            },
+          });
 
           if (overlap) {
             throw new ConflictException(
@@ -206,57 +192,42 @@ export class LeaveService {
             year <= end.getUTCFullYear();
             year++
           ) {
-            const first = new Date(
-              Date.UTC(year, 0, 1),
-            );
+            const first = new Date(Date.UTC(year, 0, 1));
+            const last = new Date(Date.UTC(year, 11, 31));
 
-            const last = new Date(
-              Date.UTC(year, 11, 31),
-            );
+            const existing = await tx.leaveRequest.findMany({
+              where: {
+                userId,
+                leaveTypeId: dto.leaveTypeId,
+                status: { in: ['PENDING', 'APPROVED'] },
+                startDate: { lte: last },
+                endDate: { gte: first },
+              },
+            });
 
-            const existing =
-              await tx.leaveRequest.findMany({
-                where: {
+            const adjustment = await tx.leaveBalance.findUnique({
+              where: {
+                userId_leaveTypeId_year: {
                   userId,
                   leaveTypeId: dto.leaveTypeId,
-                  status: {
-                    in: ['PENDING', 'APPROVED'],
-                  },
-                  startDate: { lte: last },
-                  endDate: { gte: first },
+                  year,
                 },
-              });
-
-            const adjustment =
-              await tx.leaveBalance.findUnique({
-                where: {
-                  userId_leaveTypeId_year: {
-                    userId,
-                    leaveTypeId: dto.leaveTypeId,
-                    year,
-                  },
-                },
-              });
-
-            const used = existing.reduce(
-              (total, request) => {
-                const from =
-                  request.startDate > first
-                    ? request.startDate
-                    : first;
-
-                const to =
-                  request.endDate < last
-                    ? request.endDate
-                    : last;
-
-                return (
-                  total +
-                  workingDays(from, to, holidays).length
-                );
               },
-              0,
-            );
+            });
+
+            const used = existing.reduce((total, request) => {
+              const from =
+                request.startDate > first
+                  ? request.startDate
+                  : first;
+
+              const to =
+                request.endDate < last
+                  ? request.endDate
+                  : last;
+
+              return total + workingDays(from, to, holidays).length;
+            }, 0);
 
             const requested = dates.filter(
               (date) => date.getUTCFullYear() === year,
@@ -274,19 +245,14 @@ export class LeaveService {
             }
           }
 
-          const teamRequests =
-            await tx.leaveRequest.findMany({
-              where: {
-                user: {
-                  teamId: user.teamId,
-                },
-                status: {
-                  in: ['PENDING', 'APPROVED'],
-                },
-                startDate: { lte: end },
-                endDate: { gte: start },
-              },
-            });
+          const teamRequests = await tx.leaveRequest.findMany({
+            where: {
+              user: { teamId: user.teamId },
+              status: { in: ['PENDING', 'APPROVED'] },
+              startDate: { lte: end },
+              endDate: { gte: start },
+            },
+          });
 
           for (const date of dates) {
             const off = new Set(
@@ -299,16 +265,14 @@ export class LeaveService {
                 .map((request) => request.userId),
             );
 
-            if (
-              off.size >= settings.maxTeamMembersOff
-            ) {
+            if (off.size >= settings.maxTeamMembersOff) {
               throw new ConflictException(
                 `Team coverage limit reached on ${date.toISOString().slice(0, 10)}`,
               );
             }
           }
 
-          return tx.leaveRequest.create({
+          const request = await tx.leaveRequest.create({
             data: {
               userId,
               leaveTypeId: dto.leaveTypeId,
@@ -318,13 +282,25 @@ export class LeaveService {
               days: dates.length,
             },
           });
+
+          await tx.leaveAudit.create({
+            data: {
+              requestId: request.id,
+              actorId: userId,
+              action: 'REQUESTED',
+              fromStatus: null,
+              toStatus: 'PENDING',
+            },
+          });
+
+          return request;
         },
         {
           isolationLevel: 'Serializable',
         },
       );
 
-      // The transaction has committed before email delivery.
+      // Notify only after the database transaction commits.
       await this.notifyNewRequest(created.id);
 
       return created;
@@ -349,147 +325,219 @@ export class LeaveService {
     requestId: number,
     status: 'APPROVED' | 'REJECTED',
   ) {
-    const decided = await this.prisma.$transaction(
-      async (tx) => {
-        const manager = await tx.user.findUnique({
-          where: { id: managerId },
-        });
+    const decided = await this.prisma.$transaction(async (tx) => {
+      const manager = await tx.user.findUnique({
+        where: { id: managerId },
+      });
 
-        if (manager?.role !== 'MANAGER') {
-          throw new ForbiddenException(
-            'Manager access required',
-          );
-        }
+      if (manager?.role !== 'MANAGER') {
+        throw new ForbiddenException('Manager access required');
+      }
 
-        const request =
-          await tx.leaveRequest.findUnique({
-            where: { id: requestId },
-            include: {
-              user: {
-                select: {
-                  managerId: true,
-                },
-              },
-            },
-          });
+      const request = await tx.leaveRequest.findUnique({
+        where: { id: requestId },
+        include: {
+          user: {
+            select: { managerId: true },
+          },
+        },
+      });
 
-        if (!request) {
-          throw new NotFoundException(
-            'Leave request not found',
-          );
-        }
+      if (!request) {
+        throw new NotFoundException('Leave request not found');
+      }
 
-        if (
-          request.userId === managerId ||
-          request.user.managerId !== managerId
-        ) {
-          throw new ForbiddenException(
-            'You can only decide requests from your own reports',
-          );
-        }
+      if (
+        request.userId === managerId ||
+        request.user.managerId !== managerId
+      ) {
+        throw new ForbiddenException(
+          'You can only decide requests from your own reports',
+        );
+      }
 
-        const updated =
-          await tx.leaveRequest.updateMany({
-            where: {
-              id: requestId,
-              status: 'PENDING',
-              user: { managerId },
-            },
-            data: {
-              status,
-              decidedById: managerId,
-            },
-          });
+      const updated = await tx.leaveRequest.updateMany({
+        where: {
+          id: requestId,
+          status: 'PENDING',
+          user: { managerId },
+        },
+        data: {
+          status,
+          decidedById: managerId,
+        },
+      });
 
-        if (updated.count !== 1) {
-          throw new ConflictException(
-            'Request is no longer pending',
-          );
-        }
+      if (updated.count !== 1) {
+        throw new ConflictException(
+          'Request is no longer pending',
+        );
+      }
 
-        return tx.leaveRequest.findUniqueOrThrow({
-          where: { id: requestId },
-        });
-      },
-    );
+      await tx.leaveAudit.create({
+        data: {
+          requestId,
+          actorId: managerId,
+          action: status,
+          fromStatus: 'PENDING',
+          toStatus: status,
+        },
+      });
 
-    // The decision is committed before email delivery.
+      return tx.leaveRequest.findUniqueOrThrow({
+        where: { id: requestId },
+      });
+    });
+
     await this.notifyDecision(decided.id, status);
 
     return decided;
   }
 
   async cancel(userId: number, requestId: number) {
-    const request =
-      await this.prisma.leaveRequest.findUnique({
+    return this.prisma.$transaction(async (tx) => {
+      const request = await tx.leaveRequest.findUnique({
         where: { id: requestId },
       });
 
-    if (!request) {
-      throw new NotFoundException(
-        'Leave request not found',
-      );
-    }
+      if (!request) {
+        throw new NotFoundException('Leave request not found');
+      }
 
-    if (request.userId !== userId) {
-      throw new ForbiddenException(
-        'You can only cancel your own leave',
-      );
-    }
+      if (request.userId !== userId) {
+        throw new ForbiddenException(
+          'You can only cancel your own leave',
+        );
+      }
 
-    const updated =
-      await this.prisma.leaveRequest.updateMany({
+      if (
+        request.status !== 'PENDING' &&
+        request.status !== 'APPROVED'
+      ) {
+        throw new ConflictException(
+          'Only pending or approved requests can be cancelled',
+        );
+      }
+
+      const updated = await tx.leaveRequest.updateMany({
         where: {
           id: requestId,
           userId,
-          status: {
-            in: ['PENDING', 'APPROVED'],
-          },
+          status: request.status,
         },
         data: {
           status: 'CANCELLED',
         },
       });
 
-    if (updated.count !== 1) {
-      throw new ConflictException(
-        'Only pending or approved requests can be cancelled',
+      if (updated.count !== 1) {
+        throw new ConflictException(
+          'Request changed. Refresh and try again.',
+        );
+      }
+
+      await tx.leaveAudit.create({
+        data: {
+          requestId,
+          actorId: userId,
+          action: 'CANCELLED',
+          fromStatus: request.status,
+          toStatus: 'CANCELLED',
+        },
+      });
+
+      return tx.leaveRequest.findUniqueOrThrow({
+        where: { id: requestId },
+      });
+    });
+  }
+
+  async getAudit(userId: number, requestId: number) {
+    const viewer = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        role: true,
+      },
+    });
+
+    if (!viewer) {
+      throw new ForbiddenException('Access denied');
+    }
+
+    const access =
+      viewer.role === 'ADMIN'
+        ? {}
+        : viewer.role === 'MANAGER'
+          ? {
+              OR: [
+                { userId },
+                { user: { managerId: userId } },
+              ],
+            }
+          : { userId };
+
+    const request = await this.prisma.leaveRequest.findFirst({
+      where: {
+        id: requestId,
+        ...access,
+      },
+      select: {
+        id: true,
+        auditEvents: {
+          orderBy: [
+            { createdAt: 'asc' },
+            { id: 'asc' },
+          ],
+          select: {
+            id: true,
+            action: true,
+            fromStatus: true,
+            toStatus: true,
+            createdAt: true,
+            actor: {
+              select: {
+                id: true,
+                name: true,
+                role: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!request) {
+      throw new NotFoundException(
+        'Request not found or access denied',
       );
     }
 
-    return this.prisma.leaveRequest.findUniqueOrThrow({
-      where: { id: requestId },
-    });
+    return request.auditEvents;
   }
 
   async getMyBalances(userId: number, year: number) {
     const first = new Date(Date.UTC(year, 0, 1));
     const last = new Date(Date.UTC(year, 11, 31));
 
-    const [
-      types,
-      adjustments,
-      requests,
-      holidayRows,
-    ] = await Promise.all([
-      this.prisma.leaveType.findMany({
-        orderBy: { name: 'asc' },
-      }),
-      this.prisma.leaveBalance.findMany({
-        where: { userId, year },
-      }),
-      this.prisma.leaveRequest.findMany({
-        where: {
-          userId,
-          status: {
-            in: ['PENDING', 'APPROVED'],
+    const [types, adjustments, requests, holidayRows] =
+      await Promise.all([
+        this.prisma.leaveType.findMany({
+          orderBy: { name: 'asc' },
+        }),
+        this.prisma.leaveBalance.findMany({
+          where: { userId, year },
+        }),
+        this.prisma.leaveRequest.findMany({
+          where: {
+            userId,
+            status: { in: ['PENDING', 'APPROVED'] },
+            startDate: { lte: last },
+            endDate: { gte: first },
           },
-          startDate: { lte: last },
-          endDate: { gte: first },
-        },
-      }),
-      this.prisma.publicHoliday.findMany(),
-    ]);
+        }),
+        this.prisma.publicHoliday.findMany(),
+      ]);
 
     const holidays = new Set(
       holidayRows.map((holiday) =>
@@ -500,8 +548,7 @@ export class LeaveService {
     return types.map((type) => {
       const adjustment =
         adjustments.find(
-          (balance) =>
-            balance.leaveTypeId === type.id,
+          (balance) => balance.leaveTypeId === type.id,
         )?.adjustment ?? 0;
 
       let pending = 0;
@@ -520,11 +567,7 @@ export class LeaveService {
             ? request.endDate
             : last;
 
-        const days = workingDays(
-          from,
-          to,
-          holidays,
-        ).length;
+        const days = workingDays(from, to, holidays).length;
 
         if (request.status === 'PENDING') {
           pending += days;
@@ -535,8 +578,7 @@ export class LeaveService {
         }
       }
 
-      const allowance =
-        type.yearlyAllowance + adjustment;
+      const allowance = type.yearlyAllowance + adjustment;
 
       return {
         leaveTypeId: type.id,
@@ -582,23 +624,14 @@ export class LeaveService {
       );
     }
 
-    const start = new Date(
-      Date.UTC(year, month - 1, 1),
-    );
-
-    const end = new Date(
-      Date.UTC(year, month, 0),
-    );
+    const start = new Date(Date.UTC(year, month - 1, 1));
+    const end = new Date(Date.UTC(year, month, 0));
 
     const [requests, holidays] = await Promise.all([
       this.prisma.leaveRequest.findMany({
         where: {
-          user: {
-            teamId: user.teamId,
-          },
-          status: {
-            in: ['PENDING', 'APPROVED'],
-          },
+          user: { teamId: user.teamId },
+          status: { in: ['PENDING', 'APPROVED'] },
           startDate: { lte: end },
           endDate: { gte: start },
         },
@@ -614,9 +647,7 @@ export class LeaveService {
             },
           },
         },
-        orderBy: {
-          startDate: 'asc',
-        },
+        orderBy: { startDate: 'asc' },
       }),
       this.prisma.publicHoliday.findMany({
         where: {
@@ -629,9 +660,7 @@ export class LeaveService {
           name: true,
           date: true,
         },
-        orderBy: {
-          date: 'asc',
-        },
+        orderBy: { date: 'asc' },
       }),
     ]);
 
@@ -644,35 +673,226 @@ export class LeaveService {
     };
   }
 
+  async getTeamAvailability(
+    userId: number,
+    startDate: string,
+    endDate: string,
+  ) {
+    if (
+      typeof startDate !== 'string' ||
+      typeof endDate !== 'string' ||
+      !/^\d{4}-\d{2}-\d{2}$/.test(startDate) ||
+      !/^\d{4}-\d{2}-\d{2}$/.test(endDate)
+    ) {
+      throw new BadRequestException(
+        'Enter startDate and endDate in YYYY-MM-DD format',
+      );
+    }
+
+    const start = parseDate(startDate);
+    const end = parseDate(endDate);
+
+    if (
+      start.getUTCFullYear() < 1900 ||
+      end.getUTCFullYear() > 9999
+    ) {
+      throw new BadRequestException(
+        'Dates must be between 1900 and 9999',
+      );
+    }
+
+    if (end < start) {
+      throw new BadRequestException(
+        'End date cannot precede start date',
+      );
+    }
+
+    const totalDays = Math.round((+end - +start) / DAY) + 1;
+
+    if (totalDays > 31) {
+      throw new BadRequestException(
+        'Select a maximum of 31 days',
+      );
+    }
+
+    return this.prisma.$transaction(
+      async (tx) => {
+        const viewer = await tx.user.findUnique({
+          where: { id: userId },
+          select: {
+            teamId: true,
+          },
+        });
+
+        if (!viewer) {
+          throw new NotFoundException('User not found');
+        }
+
+        if (viewer.teamId === null) {
+          throw new BadRequestException(
+            'Admin must assign you to a team',
+          );
+        }
+
+        const teamId = viewer.teamId;
+
+        const members = await tx.user.findMany({
+          where: { teamId },
+          select: {
+            id: true,
+            name: true,
+          },
+          orderBy: [
+            { name: 'asc' },
+            { id: 'asc' },
+          ],
+        });
+
+        const requests = await tx.leaveRequest.findMany({
+          where: {
+            user: { teamId },
+            status: { in: ['PENDING', 'APPROVED'] },
+            startDate: { lte: end },
+            endDate: { gte: start },
+          },
+          select: {
+            userId: true,
+            startDate: true,
+            endDate: true,
+            status: true,
+          },
+        });
+
+        const holidayRows = await tx.publicHoliday.findMany({
+          where: {
+            date: {
+              gte: start,
+              lte: end,
+            },
+          },
+          select: {
+            date: true,
+            name: true,
+          },
+          orderBy: { date: 'asc' },
+        });
+
+        const holidays = new Map(
+          holidayRows.map((holiday) => [
+            holiday.date.toISOString().slice(0, 10),
+            holiday.name,
+          ]),
+        );
+
+        const days = Array.from(
+          { length: totalDays },
+          (_, index) => {
+            const date = new Date(+start + index * DAY);
+            const dateText = date.toISOString().slice(0, 10);
+
+            const weekend =
+              date.getUTCDay() === 0 ||
+              date.getUTCDay() === 6;
+
+            const holiday = holidays.get(dateText) ?? null;
+            const workingDay = !weekend && holiday === null;
+
+            const approvedIds = new Set<number>();
+            const pendingIds = new Set<number>();
+
+            if (workingDay) {
+              for (const request of requests) {
+                if (
+                  request.startDate <= date &&
+                  request.endDate >= date
+                ) {
+                  if (request.status === 'APPROVED') {
+                    approvedIds.add(request.userId);
+                  } else if (request.status === 'PENDING') {
+                    pendingIds.add(request.userId);
+                  }
+                }
+              }
+            }
+
+            // Count each member once if inconsistent requests overlap.
+            for (const memberId of approvedIds) {
+              pendingIds.delete(memberId);
+            }
+
+            const approved = members.filter((member) =>
+              approvedIds.has(member.id),
+            );
+
+            const pending = members.filter((member) =>
+              pendingIds.has(member.id),
+            );
+
+            const available = workingDay
+              ? members.filter(
+                  (member) =>
+                    !approvedIds.has(member.id) &&
+                    !pendingIds.has(member.id),
+                )
+              : [];
+
+            return {
+              date: dateText,
+              workingDay,
+              weekend,
+              holiday,
+              totalMembers: members.length,
+              availableCount: available.length,
+              pendingCount: pending.length,
+              approvedCount: approved.length,
+              available,
+              pending,
+              approved,
+            };
+          },
+        );
+
+        return {
+          teamId,
+          startDate,
+          endDate,
+          totalMembers: members.length,
+          workingDays: days.filter((day) => day.workingDay).length,
+          days,
+        };
+      },
+      {
+        isolationLevel: 'RepeatableRead',
+      },
+    );
+  }
+
   private async notifyNewRequest(
     requestId: number,
   ): Promise<void> {
     try {
-      const request =
-        await this.prisma.leaveRequest.findUnique({
-          where: { id: requestId },
-          select: {
-            startDate: true,
-            endDate: true,
-            days: true,
-            leaveType: {
-              select: {
-                name: true,
-              },
-            },
-            user: {
-              select: {
-                name: true,
-                manager: {
-                  select: {
-                    email: true,
-                    role: true,
-                  },
+      const request = await this.prisma.leaveRequest.findUnique({
+        where: { id: requestId },
+        select: {
+          startDate: true,
+          endDate: true,
+          days: true,
+          leaveType: {
+            select: { name: true },
+          },
+          user: {
+            select: {
+              name: true,
+              manager: {
+                select: {
+                  email: true,
+                  role: true,
                 },
               },
             },
           },
-        });
+        },
+      });
 
       if (
         !request ||
@@ -686,10 +906,8 @@ export class LeaveService {
         managerEmail: request.user.manager.email,
         employeeName: request.user.name,
         leaveType: request.leaveType.name,
-        startDate:
-          request.startDate.toISOString().slice(0, 10),
-        endDate:
-          request.endDate.toISOString().slice(0, 10),
+        startDate: request.startDate.toISOString().slice(0, 10),
+        endDate: request.endDate.toISOString().slice(0, 10),
         days: request.days,
       });
     } catch {
@@ -704,34 +922,27 @@ export class LeaveService {
     status: 'APPROVED' | 'REJECTED',
   ): Promise<void> {
     try {
-      const request =
-        await this.prisma.leaveRequest.findUnique({
-          where: { id: requestId },
-          select: {
-            startDate: true,
-            endDate: true,
-            leaveType: {
-              select: {
-                name: true,
-              },
-            },
-            user: {
-              select: {
-                email: true,
-              },
-            },
+      const request = await this.prisma.leaveRequest.findUnique({
+        where: { id: requestId },
+        select: {
+          startDate: true,
+          endDate: true,
+          leaveType: {
+            select: { name: true },
           },
-        });
+          user: {
+            select: { email: true },
+          },
+        },
+      });
 
       if (!request) return;
 
       await this.mail.sendLeaveDecisionNotification({
         employeeEmail: request.user.email,
         leaveType: request.leaveType.name,
-        startDate:
-          request.startDate.toISOString().slice(0, 10),
-        endDate:
-          request.endDate.toISOString().slice(0, 10),
+        startDate: request.startDate.toISOString().slice(0, 10),
+        endDate: request.endDate.toISOString().slice(0, 10),
         status,
       });
     } catch {
